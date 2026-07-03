@@ -1,0 +1,283 @@
+# osmlogo v0 noun dictionary — compiled to cosmo tables.
+# Each table = one NOUN. Tag bundles are first-pass editorial decisions; audit against taginfo.
+
+tables:
+  parks:
+    filter: "leisure=park|garden|dog_park | landuse=recreation_ground"
+    geometry:
+      node: false
+      way: false
+      closed_way: polygon
+      relation: true
+    columns:
+      - name: name
+        source: tag:name
+      - name: osm_id
+        source: meta:id
+        type: integer
+      - name: osm_type
+        source: meta:type
+      - name: timestamp
+        source: meta:timestamp
+
+  playgrounds:
+    filter: "leisure=playground"
+    geometry:
+      node: true
+      way: false
+      closed_way: polygon
+      relation: false
+    columns:
+      - name: name
+        source: tag:name
+      - name: osm_id
+        source: meta:id
+        type: integer
+      - name: osm_type
+        source: meta:type
+      - name: timestamp
+        source: meta:timestamp
+
+  benches:
+    filter: "amenity=bench"
+    geometry:
+      node: true
+      way: false
+      closed_way: false
+      relation: false
+    columns:
+      - name: osm_id
+        source: meta:id
+        type: integer
+      - name: timestamp
+        source: meta:timestamp
+
+  toilets:
+    filter: "amenity=toilets"
+    geometry:
+      node: true
+      way: centroid
+      closed_way: centroid
+      relation: false
+    columns:
+      - name: osm_id
+        source: meta:id
+        type: integer
+      - name: timestamp
+        source: meta:timestamp
+
+  drinking_water:
+    filter: "amenity=drinking_water"
+    geometry:
+      node: true
+      way: false
+      closed_way: false
+      relation: false
+    columns:
+      - name: osm_id
+        source: meta:id
+        type: integer
+      - name: timestamp
+        source: meta:timestamp
+
+  museums:
+    filter: "tourism=museum|gallery"
+    geometry:
+      node: true
+      way: centroid
+      closed_way: centroid
+      relation: false
+    columns:
+      - name: name
+        source: tag:name
+      - name: opening_hours
+        source: tag:opening_hours
+      - name: website
+        source: tag:website
+      - name: phone
+        source: tag:phone
+      - name: osm_id
+        source: meta:id
+        type: integer
+      - name: osm_type
+        source: meta:type
+      - name: timestamp
+        source: meta:timestamp
+
+  libraries:
+    filter: "amenity=library"
+    geometry:
+      node: true
+      way: centroid
+      closed_way: centroid
+      relation: false
+    columns:
+      - name: name
+        source: tag:name
+      - name: opening_hours
+        source: tag:opening_hours
+      - name: website
+        source: tag:website
+      - name: osm_id
+        source: meta:id
+        type: integer
+      - name: timestamp
+        source: meta:timestamp
+
+  schools:
+    filter: "amenity=school|kindergarten|college|university"
+    geometry:
+      node: true
+      way: false
+      closed_way: polygon
+      relation: true
+    columns:
+      - name: name
+        source: tag:name
+      - name: osm_id
+        source: meta:id
+        type: integer
+      - name: osm_type
+        source: meta:type
+      - name: timestamp
+        source: meta:timestamp
+
+  shops:
+    filter: "shop"
+    geometry:
+      node: true
+      way: centroid
+      closed_way: centroid
+      relation: false
+    columns:
+      - name: name
+        source: tag:name
+      - name: shop
+        source: tag:shop
+      - name: opening_hours
+        source: tag:opening_hours
+      - name: website
+        source: tag:website
+      - name: phone
+        source: tag:phone
+      - name: housenumber
+        source: "tag:addr:housenumber"
+      - name: street
+        source: "tag:addr:street"
+      - name: wheelchair
+        source: tag:wheelchair
+      - name: osm_id
+        source: meta:id
+        type: integer
+      - name: osm_type
+        source: meta:type
+      - name: timestamp
+        source: meta:timestamp
+      - name: version
+        source: meta:version
+        type: integer
+
+  restaurants:
+    filter: "amenity=restaurant|fast_food|cafe|bar|pub"
+    geometry:
+      node: true
+      way: centroid
+      closed_way: centroid
+      relation: false
+    columns:
+      - name: name
+        source: tag:name
+      - name: cuisine
+        source: tag:cuisine
+      - name: opening_hours
+        source: tag:opening_hours
+      - name: website
+        source: tag:website
+      - name: wheelchair
+        source: tag:wheelchair
+      - name: osm_id
+        source: meta:id
+        type: integer
+      - name: osm_type
+        source: meta:type
+      - name: timestamp
+        source: meta:timestamp
+      - name: version
+        source: meta:version
+        type: integer
+
+  bus_stops:
+    filter: "highway=bus_stop"
+    geometry:
+      node: true
+      way: false
+      closed_way: false
+      relation: false
+    columns:
+      - name: name
+        source: tag:name
+      - name: shelter
+        source: tag:shelter
+      - name: bench
+        source: tag:bench
+      - name: osm_id
+        source: meta:id
+        type: integer
+      - name: timestamp
+        source: meta:timestamp
+
+  crossings:
+    filter: "highway=crossing"
+    geometry:
+      node: true
+      way: false
+      closed_way: false
+      relation: false
+    columns:
+      - name: crossing
+        source: tag:crossing
+      - name: lit
+        source: tag:lit
+      - name: tactile_paving
+        source: tag:tactile_paving
+      - name: osm_id
+        source: meta:id
+        type: integer
+      - name: timestamp
+        source: meta:timestamp
+
+  buildings:
+    filter: "building"
+    geometry:
+      node: false
+      way: false
+      closed_way: centroid
+      relation: false
+    columns:
+      - name: building
+        source: tag:building
+      - name: housenumber
+        source: "tag:addr:housenumber"
+      - name: street
+        source: "tag:addr:street"
+      - name: osm_id
+        source: meta:id
+        type: integer
+      - name: timestamp
+        source: meta:timestamp
+
+  boundaries:
+    filter: "boundary=administrative & admin_level=8"
+    geometry:
+      node: false
+      way: false
+      closed_way: polygon
+      relation: true
+    columns:
+      - name: name
+        source: tag:name
+      - name: admin_level
+        source: tag:admin_level
+      - name: osm_id
+        source: meta:id
+        type: integer
