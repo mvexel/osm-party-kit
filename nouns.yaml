@@ -49,6 +49,8 @@ tables:
       - name: osm_id
         source: meta:id
         type: integer
+      - name: osm_type
+        source: meta:type
       - name: timestamp
         source: meta:timestamp
 
@@ -63,6 +65,8 @@ tables:
       - name: osm_id
         source: meta:id
         type: integer
+      - name: osm_type
+        source: meta:type
       - name: timestamp
         source: meta:timestamp
 
@@ -77,6 +81,8 @@ tables:
       - name: osm_id
         source: meta:id
         type: integer
+      - name: osm_type
+        source: meta:type
       - name: timestamp
         source: meta:timestamp
 
@@ -121,6 +127,8 @@ tables:
       - name: osm_id
         source: meta:id
         type: integer
+      - name: osm_type
+        source: meta:type
       - name: timestamp
         source: meta:timestamp
 
@@ -223,6 +231,8 @@ tables:
       - name: osm_id
         source: meta:id
         type: integer
+      - name: osm_type
+        source: meta:type
       - name: timestamp
         source: meta:timestamp
 
@@ -243,6 +253,8 @@ tables:
       - name: osm_id
         source: meta:id
         type: integer
+      - name: osm_type
+        source: meta:type
       - name: timestamp
         source: meta:timestamp
 
@@ -263,6 +275,8 @@ tables:
       - name: osm_id
         source: meta:id
         type: integer
+      - name: osm_type
+        source: meta:type
       - name: timestamp
         source: meta:timestamp
 

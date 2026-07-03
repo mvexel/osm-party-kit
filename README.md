@@ -1,23 +1,37 @@
 # osmlogo
 
-Experiment: a LOGO-like constrained query vocabulary over OSM, materialized
-locally. Nouns are curated tag bundles compiled to [cosmo](../cosmo) tables;
-predicates (WITHOUT attr / CONTAINING NO noun / OLDER THAN duration / IN place)
-run as DuckDB SQL over the resulting GeoParquet. No live services.
+A LOGO-like constrained query vocabulary over OSM, materialized locally.
+Nouns are curated tag bundles compiled to [cosmo](../cosmo) tables; predicates
+(WITHOUT attr / CONTAINING NO noun / OLDER THAN duration / IN place) run as
+flat column filters over baked GeoParquet — in the browser, via DuckDB-WASM.
+No live services anywhere.
+
+## Deploy your own region
+
+1. Edit `region.json` — extract URL (Geofabrik), boundary admin_level,
+   language, map center. That's the "fill in the area" part.
+2. Optionally edit `web/lang/<lang>.json` — the language dialect: noun labels,
+   UI strings, example sentences. Add a new file for a new language and point
+   `region.json` at it. Tag bundles live in `nouns.yaml` and often deserve
+   regional tuning too.
+3. `./build.sh` (needs cosmo or `COSMO_BIN`, duckdb, curl, python3)
+4. Host the directory on any static server with Range support and open `/web/`.
 
 ## Pipeline
 
 ```
-data/utah-latest.osm.pbf          # Geofabrik public extract (has timestamps, no user ids)
-  └─ cosmo convert -i data/utah-latest.osm.pbf -o out -f nouns.yaml --format geoparquet
-       └─ out/*.parquet           # one table per noun (~2 min for Utah)
-            └─ duckdb -c ".read queries/demo.sql"
+region.json ─┐
+nouns.yaml ──┴─ build.sh
+                ├─ curl Geofabrik extract        → data/*.osm.pbf
+                ├─ cosmo convert (filters.yaml)  → out/*.parquet   (~2 min for Utah)
+                └─ duckdb queries/bake.sql       → baked/*.parquet, web/boundaries.geojson, web/places.json
+web/index.html + web/lang/<lang>.json  →  the sentence-builder app
 ```
 
 - `nouns.yaml` — the noun dictionary (14 nouns). Tag bundles are editorial
   decisions and the core curated artifact.
-- `queries/demo.sql` — the seven demo queries.
-- `boundaries` table (admin_level=8 relations) provides the `IN <place>` dropdown.
+- `queries/demo.sql`, `queries/candidates.sql` — CLI query sets from the
+  design sessions.
 
 ## Findings from run 2026-07-03
 
@@ -66,6 +80,26 @@ Runs in ~1.4 s for Utah. Verified: all baked counts match the live-spatial
 demo query results exactly (19 / 1740 / 2716 / 161 / 36 / 27041).
 ~4% of shops get no place (unincorporated areas) — place=NULL means
 "statewide only", surface as such in the UI.
+
+## Web app (web/index.html)
+
+Sentence-builder UI: "Show me [NOUN] [predicate chips] [in PLACE]" over the
+baked parquet. DuckDB-WASM (CDN) + MapLibre GL JS, no server-side anything.
+
+```
+python3 -m http.server 8017    # from the osmlogo dir
+open http://localhost:8017/web/
+```
+
+- Live counts in the + add picker (the answer arrives before the question)
+- Guardrail banner when >95% of features miss an attribute (campaign, not gap)
+- Dots capped at 2000; popups link to osm.org and "fix in iD"
+- Query state serializes to the URL hash — shareable sentences
+- Verified end-to-end with headless Chrome: SLC museums = 19, parks = 1740,
+  matching the DuckDB baselines exactly
+- python http.server lacks Range support so duckdb-wasm falls back to full
+  file reads; any real static host (nginx, GitHub Pages, Caddy) does partial
+  reads and only touches the row groups it needs
 
 ## Known v0 warts
 

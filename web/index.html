@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>osmlogo — ask the map</title>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+         display: flex; flex-direction: column; height: 100vh; }
+  header { padding: 10px 16px; background: #1a1a2e; color: #eee; display: flex;
+           align-items: center; gap: 12px; flex-wrap: wrap; }
+  header h1 { font-size: 16px; margin: 0; font-weight: 700; letter-spacing: 1px; }
+  header .status { font-size: 12px; opacity: .7; margin-left: auto; }
+  #sentence { padding: 14px 16px; background: #f4f4f8; display: flex; align-items: center;
+              gap: 8px; flex-wrap: wrap; border-bottom: 1px solid #ddd; font-size: 17px; }
+  .lead { color: #555; font-weight: 600; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px;
+          border-radius: 18px; font-weight: 700; font-size: 15px; cursor: pointer;
+          border: 2px solid transparent; user-select: none; position: relative; }
+  .chip:hover { filter: brightness(.95); }
+  .chip .x { opacity: .45; font-weight: 400; margin-left: 2px; }
+  .chip .x:hover { opacity: 1; }
+  .chip.noun  { background: #d3f2d3; color: #1b5e20; }
+  .chip.attr  { background: #ffe9c2; color: #8a5a00; }
+  .chip.spatial { background: #d6e8ff; color: #0d47a1; }
+  .chip.time  { background: #ffdcd2; color: #b23c17; }
+  .chip.place { background: #ead6ff; color: #5e1fa8; }
+  .chip.add { background: #fff; color: #888; border: 2px dashed #bbb; font-weight: 600; }
+  .chip.add:hover { color: #333; border-color: #888; }
+  #count-line { padding: 10px 16px; background: #fff; border-bottom: 1px solid #eee;
+                display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  #count { font-size: 28px; font-weight: 800; color: #1a1a2e; }
+  #count-context { color: #777; font-size: 14px; }
+  #banner { display: none; padding: 8px 16px; background: #fff3cd; color: #664d03;
+            font-size: 14px; border-bottom: 1px solid #ffe69c; }
+  #examples { padding: 8px 16px; background: #fafafa; border-bottom: 1px solid #eee;
+              font-size: 13px; color: #666; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  #examples button { border: 1px solid #ccc; background: #fff; border-radius: 14px;
+                     padding: 4px 12px; cursor: pointer; font-size: 13px; }
+  #examples button:hover { background: #eef; }
+  #map { flex: 1; min-height: 0; }
+  #menu { position: absolute; z-index: 2000; background: #fff; border: 1px solid #ccc;
+          border-radius: 10px; box-shadow: 0 6px 24px rgba(0,0,0,.18); padding: 6px;
+          max-height: 340px; overflow-y: auto; min-width: 280px; display: none; }
+  #menu .section { font-size: 11px; text-transform: uppercase; letter-spacing: 1px;
+                   color: #999; padding: 8px 10px 3px; }
+  #menu .item { padding: 7px 10px; border-radius: 6px; cursor: pointer; font-size: 14px;
+                display: flex; justify-content: space-between; gap: 14px; }
+  #menu .item:hover { background: #f0f4ff; }
+  #menu .item .n { color: #999; font-variant-numeric: tabular-nums; }
+  .maplibregl-popup-content { font-size: 13px; }
+  .maplibregl-popup-content a { color: #0d47a1; }
+  #loading-overlay { position: absolute; inset: 0; z-index: 1500; background: rgba(255,255,255,.75);
+      display: flex; align-items: center; justify-content: center; font-size: 15px; color: #444; }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="app-title">🐢 OSMLOGO</h1>
+  <span id="app-subtitle" style="font-size:13px;opacity:.8"></span>
+  <span class="status" id="status"></span>
+</header>
+
+<div id="sentence"></div>
+<div id="count-line">
+  <span id="count">—</span>
+  <span id="count-context"></span>
+</div>
+<div id="banner"></div>
+<div id="examples"><span id="try-label"></span></div>
+<div style="position:relative;flex:1;display:flex;min-height:0">
+  <div id="map"></div>
+  <div id="loading-overlay"></div>
+</div>
+<div id="menu"></div>
+
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script type="module">
+// ---------------------------------------------------------------- config (region + language dialect)
+const REGION = await (await fetch('../region.json')).json();
+const LANG = await (await fetch(`lang/${REGION.language}.json`)).json();
+const { ui: UI, nouns: NOUNS, time: TIME_OPTS, examples: EXAMPLES } = LANG;
+const MAX_DOTS = 2000;
+
+document.getElementById('app-title').textContent = `🐢 ${UI.title}`;
+document.getElementById('app-subtitle').textContent = `${UI.subtitle} — ${REGION.name}`;
+document.getElementById('try-label').textContent = UI.try;
+document.getElementById('loading-overlay').textContent = UI.loading;
+document.title = `${UI.title.toLowerCase()} — ${REGION.name}`;
+
+// ---------------------------------------------------------------- state
+let state = structuredClone(EXAMPLES[0].state);
+let conn = null, places = [];
+
+// ---------------------------------------------------------------- duckdb-wasm
+const status = (m) => document.getElementById('status').textContent = m;
+status(UI.warming);
+async function initDB() {
+  const duckdb = await import('https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.29.0/+esm');
+  const bundle = await duckdb.selectBundle(duckdb.getJsDelivrBundles());
+  const workerUrl = URL.createObjectURL(new Blob([`importScripts("${bundle.mainWorker}");`], { type: 'text/javascript' }));
+  const db = new duckdb.AsyncDuckDB(new duckdb.ConsoleLogger(duckdb.LogLevel.WARNING), new Worker(workerUrl));
+  status(UI.downloading);
+  await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
+  conn = await db.connect();
+  status(UI.ready);
+}
+const tableUrl = (n) => `'${location.origin}${location.pathname.replace(/[^/]*$/, '')}../baked/${n}.parquet'`;
+async function q(sql) {
+  const res = await conn.query(sql);
+  return res.toArray().map((r) => r.toJSON());
+}
+
+// ---------------------------------------------------------------- SQL building
+const esc = (s) => s.replace(/'/g, "''");
+function cutoff(opt) {
+  const d = new Date();
+  if (opt.kind === 'older') d.setFullYear(d.getFullYear() - opt.years);
+  else d.setMonth(d.getMonth() - opt.months);
+  return d.toISOString().slice(0, 10);
+}
+function whereClauses(st, includePlace = true) {
+  const w = [];
+  for (const p of st.preds) {
+    if (p.t === 'without') w.push(`${p.k} IS NULL`);
+    if (p.t === 'with') w.push(`${p.k} IS NOT NULL`);
+    if (p.t === 'nocontain') w.push(`${p.k} = 0`);
+    if (p.t === 'contain') w.push(`${p.k} > 0`);
+    if (p.t === 'time') {
+      const opt = TIME_OPTS.find((o) => o.key === p.k);
+      w.push(opt.kind === 'older' ? `timestamp < '${cutoff(opt)}'` : `timestamp >= '${cutoff(opt)}'`);
+    }
+  }
+  if (includePlace && st.place) w.push(`place = '${esc(st.place)}'`);
+  return w.length ? 'WHERE ' + w.join(' AND ') : '';
+}
+
+// ---------------------------------------------------------------- run query
+let runToken = 0;
+async function run() {
+  renderSentence();
+  location.hash = encodeURIComponent(JSON.stringify(state));
+  if (!conn) return;
+  const my = ++runToken;
+  const t = tableUrl(state.noun);
+  document.getElementById('count').textContent = '…';
+  try {
+    const [row] = await q(`SELECT count(*) AS c FROM ${t} ${whereClauses(state)}`);
+    if (my !== runToken) return;
+    const n = Number(row.c);
+    const [tot] = await q(`SELECT count(*) AS c FROM ${t} ${state.place ? `WHERE place='${esc(state.place)}'` : ''}`);
+    if (my !== runToken) return;
+    const total = Number(tot.c);
+    document.getElementById('count').textContent = n.toLocaleString();
+    document.getElementById('count-context').textContent =
+      `${UI.of} ${total.toLocaleString()} ${NOUNS[state.noun].label} ${state.place ? UI.in + ' ' + state.place : UI.statewide}`;
+    const banner = document.getElementById('banner');
+    if (state.preds.some((p) => p.t === 'without') && total > 50 && n / total > 0.95) {
+      banner.style.display = 'block';
+      banner.textContent = `⚠️ ${(100 * n / total).toFixed(0)}% ${UI.campaign}`;
+    } else banner.style.display = 'none';
+    await mapReady;
+    await drawDots(t, my, n);
+  } catch (e) {
+    if (my === runToken) { document.getElementById('count').textContent = '⚠'; console.error(e); }
+  }
+}
+async function drawDots(t, my, n) {
+  const hasName = 'name' in (NOUNS[state.noun].attrs || {});
+  const cols = `lon, lat, osm_id, osm_type, ${hasName ? 'name' : 'NULL AS name'}, timestamp`;
+  const rows = await q(`SELECT ${cols} FROM ${t} ${whereClauses(state)} LIMIT ${MAX_DOTS}`);
+  if (my !== runToken) return;
+  const feats = rows.filter((r) => r.lon != null).map((r) => ({
+    type: 'Feature',
+    geometry: { type: 'Point', coordinates: [r.lon, r.lat] },
+    properties: { name: r.name ?? UI.unnamed, osm_id: String(r.osm_id), osm_type: r.osm_type,
+                  ts: String(r.timestamp).slice(0, 10) },
+  }));
+  map.getSource('dots').setData({ type: 'FeatureCollection', features: feats });
+  if (feats.length) {
+    const b = new maplibregl.LngLatBounds();
+    feats.forEach((f) => b.extend(f.geometry.coordinates));
+    map.fitBounds(b, { padding: 40, maxZoom: 14 });
+  }
+  document.getElementById('count-context').textContent +=
+    n > MAX_DOTS ? ` — ${UI.showing_first} ${MAX_DOTS.toLocaleString()}, ${UI.narrow}` : '';
+}
+
+// ---------------------------------------------------------------- sentence UI
+const S = document.getElementById('sentence');
+function chip(cls, html, onRemove, onClick) {
+  const el = document.createElement('span');
+  el.className = 'chip ' + cls;
+  el.innerHTML = html;
+  if (onRemove) {
+    const x = document.createElement('span'); x.className = 'x'; x.textContent = '✕';
+    x.onclick = (e) => { e.stopPropagation(); onRemove(); };
+    el.appendChild(x);
+  }
+  if (onClick) el.onclick = onClick;
+  return el;
+}
+function predLabel(p) {
+  const nn = NOUNS[state.noun];
+  if (p.t === 'without') return `${UI.without} ${nn.attrs[p.k]}`;
+  if (p.t === 'with') return `${UI.with} ${nn.attrs[p.k]}`;
+  if (p.t === 'nocontain') return `${UI.with_no} ${nn.contains[p.k]}`;
+  if (p.t === 'contain') return `${UI.having} ${nn.contains[p.k]}`;
+  if (p.t === 'time') return TIME_OPTS.find((o) => o.key === p.k).label;
+}
+function renderSentence() {
+  S.innerHTML = `<span class="lead">${UI.lead}</span>`;
+  S.appendChild(chip('noun', `${NOUNS[state.noun].emoji} ${NOUNS[state.noun].label}`, null,
+    (e) => openMenu(e.currentTarget, nounMenu())));
+  state.preds.forEach((p, i) => {
+    const cls = p.t === 'time' ? 'time' : (p.t === 'nocontain' || p.t === 'contain') ? 'spatial' : 'attr';
+    S.appendChild(chip(cls, predLabel(p), () => { state.preds.splice(i, 1); run(); }));
+  });
+  if (state.place) S.appendChild(chip('place', `${UI.in} ${state.place}`, () => { state.place = null; run(); }));
+  S.appendChild(chip('add', UI.add, null, (e) => openMenu(e.currentTarget, addMenu())));
+}
+
+// ---------------------------------------------------------------- menus
+const menuEl = document.getElementById('menu');
+function openMenu(anchor, items) {
+  menuEl.innerHTML = '';
+  for (const it of items) {
+    if (it.section) {
+      const s = document.createElement('div'); s.className = 'section'; s.textContent = it.section;
+      menuEl.appendChild(s); continue;
+    }
+    const d = document.createElement('div'); d.className = 'item';
+    d.innerHTML = `<span>${it.label}</span><span class="n" data-count-key="${it.countKey ?? ''}"></span>`;
+    d.onclick = () => { closeMenu(); it.action(); };
+    menuEl.appendChild(d);
+  }
+  const r = anchor.getBoundingClientRect();
+  menuEl.style.left = Math.min(r.left, innerWidth - 320) + 'px';
+  menuEl.style.top = r.bottom + 6 + 'px';
+  menuEl.style.display = 'block';
+  fillMenuCounts(items);
+}
+function closeMenu() { menuEl.style.display = 'none'; }
+document.addEventListener('click', (e) => { if (!menuEl.contains(e.target) && !e.target.closest('.chip')) closeMenu(); });
+
+function nounMenu() {
+  return [{ section: UI.menu_show }, ...Object.entries(NOUNS).map(([k, v]) => ({
+    label: `${v.emoji} ${v.label}`,
+    action: () => { state.noun = k; state.preds = []; run(); },
+  }))];
+}
+function addMenu() {
+  const nn = NOUNS[state.noun];
+  const used = new Set(state.preds.map((p) => p.t + ':' + p.k));
+  const items = [];
+  const attrs = Object.entries(nn.attrs || {});
+  if (attrs.length) {
+    items.push({ section: UI.menu_missing });
+    for (const [k, l] of attrs) if (!used.has('without:' + k))
+      items.push({ label: `${UI.without} ${l}`, countKey: `without:${k}`,
+        action: () => { state.preds.push({ t: 'without', k }); run(); } });
+    items.push({ section: UI.menu_has });
+    for (const [k, l] of attrs) if (!used.has('with:' + k))
+      items.push({ label: `${UI.with} ${l}`, countKey: `with:${k}`,
+        action: () => { state.preds.push({ t: 'with', k }); run(); } });
+  }
+  const cont = Object.entries(nn.contains || {});
+  if (cont.length) {
+    items.push({ section: UI.menu_nearby });
+    for (const [k, l] of cont) {
+      if (!used.has('nocontain:' + k))
+        items.push({ label: `${UI.with_no} ${l}`, countKey: `nocontain:${k}`,
+          action: () => { state.preds.push({ t: 'nocontain', k }); run(); } });
+      if (!used.has('contain:' + k))
+        items.push({ label: `${UI.having} ${l}`, countKey: `contain:${k}`,
+          action: () => { state.preds.push({ t: 'contain', k }); run(); } });
+    }
+  }
+  if (!state.preds.some((p) => p.t === 'time')) {
+    items.push({ section: UI.menu_fresh });
+    for (const o of TIME_OPTS)
+      items.push({ label: o.label, countKey: `time:${o.key}`,
+        action: () => { state.preds.push({ t: 'time', k: o.key }); run(); } });
+  }
+  if (!state.place) {
+    items.push({ section: UI.menu_where });
+    for (const p of places)
+      items.push({ label: `${UI.in} ${p}`, action: () => { state.place = p; run(); } });
+  }
+  return items;
+}
+// counts inside the picker — the answer arrives before the question is finished
+async function fillMenuCounts(items) {
+  if (!conn) return;
+  const t = tableUrl(state.noun);
+  for (const it of items) {
+    if (!it.countKey) continue;
+    const [tt, k] = it.countKey.split(':');
+    const trial = { ...state, preds: [...state.preds, { t: tt, k }] };
+    try {
+      const [row] = await q(`SELECT count(*) AS c FROM ${t} ${whereClauses(trial)}`);
+      const el = menuEl.querySelector(`[data-count-key="${it.countKey}"]`);
+      if (el) el.textContent = Number(row.c).toLocaleString();
+    } catch { /* menu may have closed */ }
+  }
+}
+
+// ---------------------------------------------------------------- map (MapLibre GL)
+const map = new maplibregl.Map({
+  container: 'map',
+  center: REGION.map_center,
+  zoom: REGION.map_zoom,
+  style: {
+    version: 8,
+    sources: {
+      osm: { type: 'raster', tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+             tileSize: 256, attribution: '© OpenStreetMap contributors' },
+    },
+    layers: [{ id: 'osm', type: 'raster', source: 'osm' }],
+  },
+});
+map.addControl(new maplibregl.NavigationControl(), 'top-right');
+const mapReady = new Promise((res) => map.on('load', () => {
+  map.addSource('bounds', { type: 'geojson', data: 'boundaries.geojson' });
+  map.addLayer({ id: 'bounds-line', type: 'line', source: 'bounds',
+    paint: { 'line-color': '#666', 'line-width': 1, 'line-dasharray': [3, 2] } });
+  map.addSource('dots', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  map.addLayer({ id: 'dots-circle', type: 'circle', source: 'dots',
+    paint: { 'circle-radius': 5.5, 'circle-color': '#ab47bc', 'circle-opacity': 0.8,
+             'circle-stroke-width': 1, 'circle-stroke-color': '#7b1fa2' } });
+  map.on('click', 'dots-circle', (e) => {
+    const p = e.features[0].properties;
+    const osmUrl = `https://www.openstreetmap.org/${p.osm_type}/${p.osm_id}`;
+    const idUrl = `https://www.openstreetmap.org/edit?${p.osm_type}=${p.osm_id}`;
+    new maplibregl.Popup().setLngLat(e.lngLat).setHTML(
+      `<b>${p.name}</b><br>${UI.last_edited} ${p.ts}<br>
+       <a href="${osmUrl}" target="_blank">${UI.view_osm}</a> · <a href="${idUrl}" target="_blank">${UI.fix_id}</a>`
+    ).addTo(map);
+  });
+  map.on('mouseenter', 'dots-circle', () => map.getCanvas().style.cursor = 'pointer');
+  map.on('mouseleave', 'dots-circle', () => map.getCanvas().style.cursor = '');
+  res();
+}));
+
+// ---------------------------------------------------------------- boot
+const exBox = document.getElementById('examples');
+EXAMPLES.forEach((ex) => {
+  const b = document.createElement('button');
+  b.textContent = ex.label;
+  b.onclick = () => { state = structuredClone(ex.state); run(); };
+  exBox.appendChild(b);
+});
+if (location.hash.length > 2) {
+  try { state = JSON.parse(decodeURIComponent(location.hash.slice(1))); } catch { /* keep default */ }
+}
+renderSentence();
+(async () => {
+  places = (await (await fetch('places.json')).json()).map((r) => r.name);
+  await initDB();
+  document.getElementById('loading-overlay').style.display = 'none';
+  run();
+})().catch((e) => { status(UI.engine_failed); console.error(e); });
+</script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+{
+  "name": "Utah",
+  "extract_url": "https://download.geofabrik.de/north-america/us/utah-latest.osm.pbf",
+  "admin_level": 8,
+  "language": "en",
+  "map_center": [-111.9, 40.65],
+  "map_zoom": 9.5
+}
