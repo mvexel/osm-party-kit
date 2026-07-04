@@ -50,6 +50,8 @@
                 display: flex; justify-content: space-between; gap: 14px; }
   #menu .item:hover { background: #f0f4ff; }
   #menu .item .n { color: #999; font-variant-numeric: tabular-nums; }
+  #menu .place-search { width: calc(100% - 12px); margin: 4px 6px; padding: 6px 8px;
+                        border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
   .maplibregl-popup-content { font-size: 13px; }
   .maplibregl-popup-content a { color: #0d47a1; }
   #loading-overlay { position: absolute; inset: 0; z-index: 1500; background: rgba(255,255,255,.75);
@@ -254,6 +256,7 @@ function openMenu(anchor, items) {
       const s = document.createElement('div'); s.className = 'section'; s.textContent = it.section;
       menuEl.appendChild(s); continue;
     }
+    if (it.placePicker) { menuEl.appendChild(buildPlacePicker()); continue; }
     const d = document.createElement('div'); d.className = 'item';
     d.innerHTML = `<span>${it.label}</span><span class="n" data-count-key="${it.countKey ?? ''}"></span>`;
     d.onclick = () => { closeMenu(); it.action(); };
@@ -309,10 +312,52 @@ function addMenu() {
   }
   if (!state.place) {
     items.push({ section: UI.menu_where });
-    for (const p of places)
-      items.push({ label: `${UI.in} ${p}`, action: () => { state.place = p; run(); } });
+    items.push({ placePicker: true });
   }
   return items;
+}
+// typeahead over the (long) place list, sorted by how many results each place holds
+function buildPlacePicker() {
+  const wrap = document.createElement('div');
+  const inp = document.createElement('input');
+  inp.className = 'place-search';
+  inp.placeholder = UI.search_places ?? 'type to filter…';
+  const list = document.createElement('div');
+  wrap.append(inp, list);
+  let counts = null;
+  const render = () => {
+    const f = inp.value.trim().toLowerCase();
+    const matched = places.filter((p) => p.toLowerCase().includes(f));
+    if (counts) matched.sort((a, b) => (counts.get(b) ?? 0) - (counts.get(a) ?? 0) || a.localeCompare(b));
+    list.innerHTML = '';
+    for (const p of matched.slice(0, 12)) {
+      const d = document.createElement('div');
+      d.className = 'item';
+      d.innerHTML = `<span>${UI.in} ${p}</span><span class="n">${counts?.get(p)?.toLocaleString() ?? ''}</span>`;
+      d.onclick = () => { closeMenu(); state.place = p; run(); };
+      list.appendChild(d);
+    }
+    if (matched.length > 12) {
+      const more = document.createElement('div');
+      more.className = 'section';
+      more.textContent = `+ ${(matched.length - 12).toLocaleString()} — ${inp.placeholder}`;
+      list.appendChild(more);
+    }
+  };
+  inp.oninput = render;
+  inp.onkeydown = (e) => { if (e.key === 'Enter') list.querySelector('.item')?.click(); };
+  render();
+  (async () => {
+    if (!conn) return;
+    try {
+      const rows = await q(`SELECT place, count(*) AS c FROM ${tableUrl(state.noun)}
+                            ${whereClauses(state, false)} GROUP BY place`);
+      counts = new Map(rows.filter((r) => r.place != null).map((r) => [r.place, Number(r.c)]));
+      render();
+    } catch { /* menu may have closed */ }
+  })();
+  setTimeout(() => inp.focus(), 0);
+  return wrap;
 }
 // counts inside the picker — the answer arrives before the question is finished
 async function fillMenuCounts(items) {
