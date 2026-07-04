@@ -21,6 +21,11 @@ class RangeHandler(SimpleHTTPRequestHandler):
     range = None  # end_headers can run before send_head (e.g. send_error on a bad request)
 
     def send_head(self):
+        if self.path == "/":
+            self.send_response(301)
+            self.send_header("Location", "/web/")
+            self.end_headers()
+            return None
         self.range = None
         m = RANGE_RE.match(self.headers.get("Range", ""))
         if not m:
@@ -84,8 +89,8 @@ if __name__ == "__main__":
     os.chdir(ROOT)
     host = socket.gethostname().removesuffix(".local").lower()
     print(f"\n  🐢 osmlogo is up — everyone on this network can join:\n")
-    print(f"     http://{host}.local:{PORT}/web/   (type this on laptops — mDNS)")
-    print(f"     http://{lan_ip()}:{PORT}/web/   (fallback if .local doesn't resolve)\n")
+    print(f"     http://{host}.local:{PORT}   (type this on laptops — mDNS)")
+    print(f"     http://{lan_ip()}:{PORT}   (fallback if .local doesn't resolve)\n")
     print("  (open it yourself and hit 'share' to show a QR for phones)")
     print("  Ctrl-C to stop.\n")
     ThreadingHTTPServer(("", PORT), RangeHandler).serve_forever()

@@ -68,6 +68,8 @@
                         border-radius: 14px; padding: 5px 14px; cursor: pointer; font-size: 13px; }
   #share-url { margin-top: 8px; width: 100%; font-size: 11px; color: #555; border: 1px solid #ddd;
                border-radius: 6px; padding: 5px 7px; background: #fafafa; }
+  #share-join { font-family: ui-monospace, monospace; font-size: 24px; font-weight: 800;
+                color: #1a1a2e; margin: 2px 0 10px; word-break: break-all; }
 </style>
 </head>
 <body>
@@ -78,6 +80,8 @@
   <button id="share-btn"></button>
 </header>
 <div id="share-panel">
+  <div class="hint" id="share-join-label"></div>
+  <div id="share-join"></div>
   <div id="share-qr"></div>
   <div class="hint" id="share-hint"></div>
   <input id="share-url" readonly>
@@ -419,6 +423,8 @@ const copyBtn = document.getElementById('share-copy');
 shareBtn.textContent = UI.share ?? 'share';
 copyBtn.textContent = UI.copy_link ?? 'copy link';
 document.getElementById('share-hint').textContent = UI.share_hint ?? 'scan to open this sentence';
+document.getElementById('share-join-label').textContent = UI.join_at ?? 'join at';
+document.getElementById('share-join').textContent = location.host;
 const shareUrl = document.getElementById('share-url');
 function renderShareQR() {
   if (sharePanel.style.display !== 'block') return;
