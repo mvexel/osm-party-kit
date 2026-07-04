@@ -59,9 +59,12 @@
   .hdr-btn { border: 1px solid #555; background: transparent; color: #eee; border-radius: 14px;
              padding: 4px 12px; cursor: pointer; font-size: 13px; }
   .hdr-btn:hover { background: #333; }
-  .maplibregl-ctrl button.ctrl-emoji { font-size: 16px; }
+  .maplibregl-ctrl-group button { width: 44px; height: 44px; }
+  .maplibregl-ctrl button.ctrl-emoji { font-size: 22px; }
   .maplibregl-ctrl button.ctrl-emoji.active { background: #ffe0ec; box-shadow: inset 0 0 0 2px #e91e63; }
   .maplibregl-ctrl button.ctrl-emoji.off { opacity: .35; }
+  #draw-frame { display: none; position: absolute; inset: 0; z-index: 1600; pointer-events: none;
+                box-shadow: inset 0 0 0 8px #ffd400; }
   #identity-btn { display: none; align-items: center; gap: 6px; }
   .swatch-dot { display: inline-block; width: 12px; height: 12px; border-radius: 999px;
                 border: 1px solid rgba(255,255,255,.75); vertical-align: -1px; }
@@ -143,6 +146,7 @@
 <div id="examples"><span id="try-label"></span></div>
 <div style="position:relative;flex:1;display:flex;min-height:0">
   <div id="map"></div>
+  <div id="draw-frame"></div>
   <div id="loading-overlay"></div>
   <div id="draw-toolbar">
     <button id="pen-tool"></button>
@@ -533,7 +537,7 @@ const map = new maplibregl.Map({
     layers: [{ id: 'osm', type: 'raster', source: 'osm' }],
   },
 });
-map.addControl(new maplibregl.NavigationControl(), 'top-right');
+map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
 const mapReady = new Promise((res) => map.on('load', () => {
   map.addSource('bounds', { type: 'geojson', data: 'boundaries.geojson' });
   map.addLayer({ id: 'bounds-line', type: 'line', source: 'bounds',
@@ -558,13 +562,6 @@ const mapReady = new Promise((res) => map.on('load', () => {
     layout: { 'line-cap': 'round', 'line-join': 'round' },
     paint: { 'line-color': ['get', 'c'], 'line-width': zoomScale(2, 4.5), 'line-opacity': 0.85 } });
   map.addSource('scribble-stamps', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-  // The halo: a translucent white disc with a thin ring in the mapper's
-  // colour, hugging the emoji icon (44px at size 1) — attribution without
-  // turning every stamp into a billboard.
-  map.addLayer({ id: 'scribble-stamp-rings', type: 'circle', source: 'scribble-stamps',
-    paint: { 'circle-radius': zoomScale(9, 15), 'circle-color': '#fff', 'circle-opacity': 0.65,
-             'circle-stroke-width': zoomScale(1.5, 2.5), 'circle-stroke-color': ['get', 'c'],
-             'circle-stroke-opacity': 0.9 } });
   // MapLibre renders text-field as SDF glyphs, which don't include colour emoji.
   // Rasterise each emoji via canvas (system emoji font) and use it as an icon.
   addStampImages();
@@ -591,7 +588,7 @@ let activeStamp = STAMP_GLYPHS[0];
 
 // Draw on/off and layer show/hide are map context, so they live on the map
 // as a MapLibre control rather than in the page header.
-const SCRIBBLE_LAYERS = ['scribbles-line', 'scribble-stamp-rings', 'scribble-stamp-labels', 'scribble-draft-line'];
+const SCRIBBLE_LAYERS = ['scribbles-line', 'scribble-stamp-labels', 'scribble-draft-line'];
 const drawCtrlBtn = document.createElement('button');
 const layerCtrlBtn = document.createElement('button');
 drawCtrlBtn.className = layerCtrlBtn.className = 'ctrl-emoji';
@@ -654,6 +651,7 @@ function setDrawMode(on) {
   drawCtrlBtn.classList.toggle('active', on);
   drawCtrlBtn.title = on ? (UI.drawing ?? 'drawing — tap to stop') : (UI.draw ?? 'draw');
   drawToolbar.style.display = scribbleOK && on ? 'flex' : 'none';
+  document.getElementById('draw-frame').style.display = on ? 'block' : 'none';
   const canvas = map.getCanvas();
   canvas.style.cursor = on ? 'crosshair' : '';
   canvas.style.touchAction = on ? 'none' : '';
@@ -693,6 +691,7 @@ mapReady.then(() => {
       mine.push(id);
       localStorage.scribbleMine = JSON.stringify(mine);
       postScribble({ t: 's', id, c: myColor, h: myHandle, g: activeStamp, pts: [px2ll(e)] });
+      setDrawMode(false);
       return;
     }
     canvas.setPointerCapture(e.pointerId);
