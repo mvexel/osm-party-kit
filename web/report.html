@@ -143,10 +143,10 @@ map.on('load', () => {
     paint: { 'line-color': ['get', 'c'], 'line-width': 4, 'line-opacity': 0.9 } });
   map.addSource('scribble-stamps', { type: 'geojson', data: features.stamps });
   map.addLayer({ id: 'scribble-stamp-rings', type: 'circle', source: 'scribble-stamps',
-    paint: { 'circle-radius': 14, 'circle-color': ['get', 'c'], 'circle-opacity': 0.88,
-             'circle-stroke-width': 2, 'circle-stroke-color': '#fff' } });
+    paint: { 'circle-radius': 9, 'circle-color': '#fff', 'circle-opacity': 0.9,
+             'circle-stroke-width': 3, 'circle-stroke-color': ['get', 'c'] } });
   map.addLayer({ id: 'scribble-stamp-labels', type: 'symbol', source: 'scribble-stamps',
-    layout: { 'text-field': ['get', 'g'], 'text-size': 18, 'text-allow-overlap': true,
+    layout: { 'text-field': ['get', 'g'], 'text-size': 24, 'text-allow-overlap': true,
               'text-ignore-placement': true } });
   if (scribbleCount) {
     const b = new maplibregl.LngLatBounds();

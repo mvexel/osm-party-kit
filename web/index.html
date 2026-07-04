@@ -63,12 +63,14 @@
   #identity-btn { display: none; align-items: center; gap: 6px; }
   .swatch-dot { display: inline-block; width: 12px; height: 12px; border-radius: 999px;
                 border: 1px solid rgba(255,255,255,.75); vertical-align: -1px; }
-  #draw-toolbar { display: none; padding: 8px 16px; background: #20203a; color: #eee;
-                  gap: 8px; align-items: center; flex-wrap: wrap; border-top: 1px solid #303052; }
-  #draw-toolbar button { border: 1px solid #595978; background: transparent; color: #eee;
-                         border-radius: 14px; padding: 5px 10px; cursor: pointer; font-size: 13px; }
-  #draw-toolbar button.active { background: #fff; color: #1a1a2e; border-color: #fff; }
-  #draw-toolbar .stamp { min-width: 34px; font-size: 16px; line-height: 1; }
+  #draw-toolbar { display: none; position: absolute; z-index: 1700; left: 12px; bottom: 18px;
+                  background: rgba(255,255,255,.94); color: #222; border: 1px solid #ccc;
+                  border-radius: 8px; box-shadow: 0 4px 18px rgba(0,0,0,.18); padding: 6px;
+                  gap: 6px; align-items: center; flex-wrap: wrap; max-width: calc(100vw - 24px); }
+  #draw-toolbar button { border: 1px solid #ccc; background: #fff; color: #222;
+                         border-radius: 6px; padding: 6px 10px; cursor: pointer; font-size: 13px; }
+  #draw-toolbar button.active { background: #1a1a2e; color: #fff; border-color: #1a1a2e; }
+  #draw-toolbar .stamp { width: 36px; height: 34px; padding: 0; font-size: 18px; line-height: 1; }
   #share-panel { display: none; position: absolute; z-index: 2500; top: 52px; right: 12px;
                  background: #fff; border: 1px solid #ccc; border-radius: 12px; padding: 16px;
                  box-shadow: 0 6px 24px rgba(0,0,0,.18); text-align: center; max-width: 320px; }
@@ -110,13 +112,6 @@
   <button id="undo-btn" class="hdr-btn" style="display:none"></button>
   <button id="share-btn" class="hdr-btn"></button>
 </header>
-<div id="draw-toolbar">
-  <button id="pen-tool"></button>
-  <button class="stamp" data-stamp="📍">📍</button>
-  <button class="stamp" data-stamp="✅">✅</button>
-  <button class="stamp" data-stamp="❓">❓</button>
-  <button class="stamp" data-stamp="⚠️">⚠️</button>
-</div>
 <div id="share-panel">
   <div class="hint" id="share-join-label"></div>
   <div id="share-join"></div>
@@ -150,6 +145,13 @@
 <div style="position:relative;flex:1;display:flex;min-height:0">
   <div id="map"></div>
   <div id="loading-overlay"></div>
+  <div id="draw-toolbar">
+    <button id="pen-tool"></button>
+    <button class="stamp" data-stamp="📍">📍</button>
+    <button class="stamp" data-stamp="✅">✅</button>
+    <button class="stamp" data-stamp="❓">❓</button>
+    <button class="stamp" data-stamp="⚠️">⚠️</button>
+  </div>
 </div>
 <div id="menu"></div>
 
@@ -501,6 +503,24 @@ identityBtn.onclick = () => setIdentityOpen(true);
 updateIdentityButton();
 
 // ---------------------------------------------------------------- map (MapLibre GL)
+// Draw each stamp emoji to a canvas and register it as a map image (id = the
+// glyph itself, so `['get','g']` resolves directly). Canvas uses the system
+// colour-emoji font, which the vector glyph pipeline cannot.
+function addStampImages() {
+  const px = 44, ratio = 2, size = px * ratio;
+  for (const g of STAMP_GLYPHS) {
+    if (map.hasImage(g)) continue;
+    const c = document.createElement('canvas');
+    c.width = c.height = size;
+    const ctx = c.getContext('2d');
+    ctx.font = `${Math.round(size * 0.78)}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(g, size / 2, size / 2 + size * 0.04);
+    map.addImage(g, ctx.getImageData(0, 0, size, size), { pixelRatio: ratio });
+  }
+}
+
 const map = new maplibregl.Map({
   container: 'map',
   center: REGION.map_center,
@@ -540,11 +560,14 @@ const mapReady = new Promise((res) => map.on('load', () => {
     paint: { 'line-color': ['get', 'c'], 'line-width': 4, 'line-opacity': 0.85 } });
   map.addSource('scribble-stamps', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
   map.addLayer({ id: 'scribble-stamp-rings', type: 'circle', source: 'scribble-stamps',
-    paint: { 'circle-radius': 14, 'circle-color': ['get', 'c'], 'circle-opacity': 0.88,
-             'circle-stroke-width': 2, 'circle-stroke-color': '#fff' } });
+    paint: { 'circle-radius': 9, 'circle-color': '#fff', 'circle-opacity': 0.9,
+             'circle-stroke-width': 3, 'circle-stroke-color': ['get', 'c'] } });
+  // MapLibre renders text-field as SDF glyphs, which don't include colour emoji.
+  // Rasterise each emoji via canvas (system emoji font) and use it as an icon.
+  addStampImages();
   map.addLayer({ id: 'scribble-stamp-labels', type: 'symbol', source: 'scribble-stamps',
-    layout: { 'text-field': ['get', 'g'], 'text-size': 18, 'text-allow-overlap': true,
-              'text-ignore-placement': true } });
+    layout: { 'icon-image': ['get', 'g'], 'icon-size': 1, 'icon-allow-overlap': true,
+              'icon-ignore-placement': true } });
   map.addSource('scribble-draft', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
   map.addLayer({ id: 'scribble-draft-line', type: 'line', source: 'scribble-draft',
     layout: { 'line-cap': 'round', 'line-join': 'round' },
