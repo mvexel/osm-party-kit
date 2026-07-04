@@ -54,6 +54,16 @@
   .maplibregl-popup-content a { color: #0d47a1; }
   #loading-overlay { position: absolute; inset: 0; z-index: 1500; background: rgba(255,255,255,.75);
       display: flex; align-items: center; justify-content: center; font-size: 15px; color: #444; }
+  #share-btn { border: 1px solid #555; background: transparent; color: #eee; border-radius: 14px;
+               padding: 4px 12px; cursor: pointer; font-size: 13px; }
+  #share-btn:hover { background: #333; }
+  #share-panel { display: none; position: absolute; z-index: 2500; top: 52px; right: 12px;
+                 background: #fff; border: 1px solid #ccc; border-radius: 12px; padding: 16px;
+                 box-shadow: 0 6px 24px rgba(0,0,0,.18); text-align: center; max-width: 320px; }
+  #share-panel svg { width: 220px; height: 220px; }
+  #share-panel .hint { font-size: 12px; color: #777; margin-top: 6px; }
+  #share-panel button { margin-top: 8px; border: 1px solid #ccc; background: #fff;
+                        border-radius: 14px; padding: 5px 14px; cursor: pointer; font-size: 13px; }
 </style>
 </head>
 <body>
@@ -61,7 +71,13 @@
   <h1 id="app-title">🐢 OSMLOGO</h1>
   <span id="app-subtitle" style="font-size:13px;opacity:.8"></span>
   <span class="status" id="status"></span>
+  <button id="share-btn"></button>
 </header>
+<div id="share-panel">
+  <div id="share-qr"></div>
+  <div class="hint" id="share-hint"></div>
+  <button id="share-copy"></button>
+</div>
 
 <div id="sentence"></div>
 <div id="count-line">
@@ -77,6 +93,7 @@
 <div id="menu"></div>
 
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 <script type="module">
 // ---------------------------------------------------------------- config (region + language dialect)
 const REGION = await (await fetch('../region.json')).json();
@@ -139,9 +156,12 @@ function whereClauses(st, includePlace = true) {
 
 // ---------------------------------------------------------------- run query
 let runToken = 0;
+let myHash = '';
 async function run() {
   renderSentence();
-  location.hash = encodeURIComponent(JSON.stringify(state));
+  myHash = encodeURIComponent(JSON.stringify(state));
+  location.hash = myHash;
+  renderShareQR();
   if (!conn) return;
   const my = ++runToken;
   const t = tableUrl(state.noun);
@@ -343,6 +363,39 @@ const mapReady = new Promise((res) => map.on('load', () => {
   map.on('mouseleave', 'dots-circle', () => map.getCanvas().style.cursor = '');
   res();
 }));
+
+// ---------------------------------------------------------------- share (copy link + QR for the room)
+const sharePanel = document.getElementById('share-panel');
+const shareBtn = document.getElementById('share-btn');
+const copyBtn = document.getElementById('share-copy');
+shareBtn.textContent = UI.share ?? 'share';
+copyBtn.textContent = UI.copy_link ?? 'copy link';
+document.getElementById('share-hint').textContent = UI.share_hint ?? 'scan to open this sentence';
+function renderShareQR() {
+  if (sharePanel.style.display !== 'block') return;
+  const code = qrcode(0, 'M');
+  code.addData(location.href);
+  code.make();
+  document.getElementById('share-qr').innerHTML = code.createSvgTag({ scalable: true, margin: 2 });
+}
+shareBtn.onclick = (e) => {
+  e.stopPropagation();
+  sharePanel.style.display = sharePanel.style.display === 'block' ? 'none' : 'block';
+  renderShareQR();
+};
+copyBtn.onclick = async () => {
+  try { await navigator.clipboard.writeText(location.href); } catch { /* http origin: clipboard may be blocked */ }
+  copyBtn.textContent = UI.copied ?? 'copied ✓';
+  setTimeout(() => copyBtn.textContent = UI.copy_link ?? 'copy link', 1500);
+};
+document.addEventListener('click', (e) => {
+  if (!sharePanel.contains(e.target) && e.target !== shareBtn) sharePanel.style.display = 'none';
+});
+// a shared link pasted into an already-open tab takes effect immediately
+addEventListener('hashchange', () => {
+  if (location.hash.slice(1) === myHash) return;
+  try { state = JSON.parse(decodeURIComponent(location.hash.slice(1))); run(); } catch { /* ignore junk */ }
+});
 
 // ---------------------------------------------------------------- boot
 const exBox = document.getElementById('examples');

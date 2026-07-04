@@ -29,7 +29,11 @@
     "without": "without",
     "with": "with",
     "with_no": "with no",
-    "having": "having"
+    "having": "having",
+    "share": "share",
+    "copy_link": "copy link",
+    "copied": "copied ✓",
+    "share_hint": "scan to open this sentence"
   },
   "time": [
     { "key": "older1", "label": "not edited in 1 year", "kind": "older", "years": 1 },

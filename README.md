@@ -17,6 +17,19 @@ No live services anywhere.
 3. `./build.sh` (needs cosmo or `COSMO_BIN`, duckdb, curl, python3)
 4. Host the directory on any static server with Range support and open `/web/`.
 
+## Map together (same room)
+
+```
+python3 serve.py        # prints http://<your-lan-ip>:8765/web/
+```
+
+Everyone on the same network opens that URL — each browser runs its own
+DuckDB-WASM against the same baked data; there is no shared server state.
+The sentence lives in the URL hash, so any query is a shareable link: the
+**share** button shows a QR + copy-link for the room, and pasting a shared
+link into an already-open tab takes effect immediately. (Clients still need
+internet for map tiles and the CDN-hosted engine.)
+
 ## Pipeline
 
 ```
