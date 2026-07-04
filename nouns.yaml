@@ -3,7 +3,7 @@
 
 tables:
   parks:
-    filter: "leisure=park|garden|dog_park | landuse=recreation_ground"
+    filter: "leisure=park|dog_park | landuse=recreation_ground"
     geometry:
       node: false
       way: false
@@ -23,7 +23,7 @@ tables:
   playgrounds:
     filter: "leisure=playground"
     geometry:
-      node: true
+      node: false
       way: false
       closed_way: polygon
       relation: false
@@ -186,10 +186,10 @@ tables:
         type: integer
 
   restaurants:
-    filter: "amenity=restaurant|fast_food|cafe|bar|pub"
+    filter: "amenity=restaurant|fast_food|cafe"
     geometry:
       node: true
-      way: centroid
+      way: false
       closed_way: centroid
       relation: false
     columns:
@@ -219,7 +219,7 @@ tables:
     geometry:
       node: true
       way: false
-      closed_way: false
+      closed_way: centroid
       relation: false
     columns:
       - name: name
