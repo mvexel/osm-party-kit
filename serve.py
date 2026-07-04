@@ -18,6 +18,8 @@ RANGE_RE = re.compile(r"bytes=(\d*)-(\d*)")
 
 
 class RangeHandler(SimpleHTTPRequestHandler):
+    range = None  # end_headers can run before send_head (e.g. send_error on a bad request)
+
     def send_head(self):
         self.range = None
         m = RANGE_RE.match(self.headers.get("Range", ""))
