@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>party report</title>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+         display: flex; flex-direction: column; height: 100vh; }
+  header { padding: 12px 16px; background: #1a1a2e; color: #eee; display: flex;
+           align-items: baseline; gap: 14px; flex-wrap: wrap; }
+  header h1 { font-size: 16px; margin: 0; font-weight: 700; letter-spacing: 1px; }
+  header .stats { font-size: 13px; opacity: .85; }
+  header a { color: #9ecbff; font-size: 13px; }
+  header button { margin-left: auto; border: 1px solid #555; background: transparent; color: #eee;
+                  border-radius: 14px; padding: 4px 12px; cursor: pointer; font-size: 13px; }
+  #map { flex: 1; min-height: 0; }
+  #empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+           font-size: 16px; color: #555; background: rgba(255,255,255,.7); z-index: 10; }
+  @media print {
+    header button { display: none; }
+    .maplibregl-ctrl { display: none !important; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">🖍️ party report</h1>
+  <span class="stats" id="stats"></span>
+  <span id="pad"></span>
+  <button id="print-btn" onclick="print()"></button>
+</header>
+<div style="position:relative;flex:1;display:flex;min-height:0">
+  <div id="map"></div>
+  <div id="empty" style="display:none"></div>
+</div>
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script type="module">
+const REGION = await (await fetch('../region.json')).json();
+const UI = (await (await fetch(`lang/${REGION.language}.json`)).json()).ui;
+document.getElementById('title').textContent = `🖍️ ${UI.report_title ?? 'party report'} — ${REGION.name}`;
+document.getElementById('print-btn').textContent = UI.report_print ?? 'print / save as PDF';
+document.title = `${UI.report_title ?? 'party report'} — ${REGION.name}`;
+
+try {
+  const party = await (await fetch('party.json')).json();
+  if (party.pad_url) document.getElementById('pad').innerHTML =
+    `<a href="${party.pad_url}" target="_blank">📝 ${UI.pad_link ?? 'party pad'}</a>`;
+} catch { /* no party.json */ }
+
+const strokes = new Map();
+try {
+  const text = await (await fetch(`../party/scribbles.jsonl?t=${Date.now()}`)).text();
+  for (const line of text.split('\n')) {
+    if (!line.trim()) continue;
+    try {
+      const m = JSON.parse(line);
+      if (m.t === 's') strokes.set(m.id, m);
+      if (m.t === 'e') strokes.delete(m.id);
+    } catch { /* skip bad line */ }
+  }
+} catch { /* no scribble file (static host) */ }
+
+const feats = [...strokes.values()].map((m) => ({
+  type: 'Feature',
+  geometry: { type: 'LineString', coordinates: m.pts },
+  properties: { c: m.c },
+}));
+const colors = new Set([...strokes.values()].map((m) => m.c));
+const times = [...strokes.values()].map((m) => m.ts * 1000).filter(Boolean).sort((a, b) => a - b);
+const fmt = (t) => new Date(t).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+document.getElementById('stats').textContent = feats.length
+  ? `${feats.length} ${UI.report_scribbles ?? 'scribbles'} · ${colors.size} ${UI.report_colors ?? 'colors'}` +
+    (times.length ? ` · ${UI.report_between ?? 'drawn between'} ${fmt(times[0])} — ${fmt(times.at(-1))}` : '')
+  : '';
+if (!feats.length) {
+  const empty = document.getElementById('empty');
+  empty.style.display = 'flex';
+  empty.textContent = UI.report_none ?? 'no scribbles yet — go draw on the map!';
+}
+
+const map = new maplibregl.Map({
+  container: 'map',
+  center: REGION.map_center,
+  zoom: REGION.map_zoom,
+  style: {
+    version: 8,
+    sources: {
+      osm: { type: 'raster', tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+             tileSize: 256, attribution: '© OpenStreetMap contributors' },
+    },
+    layers: [{ id: 'osm', type: 'raster', source: 'osm' }],
+  },
+});
+map.addControl(new maplibregl.NavigationControl(), 'top-right');
+map.on('load', () => {
+  map.addSource('scribbles', { type: 'geojson', data: { type: 'FeatureCollection', features: feats } });
+  map.addLayer({ id: 'scribbles-line', type: 'line', source: 'scribbles',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': ['get', 'c'], 'line-width': 4, 'line-opacity': 0.9 } });
+  if (feats.length) {
+    const b = new maplibregl.LngLatBounds();
+    feats.forEach((f) => f.geometry.coordinates.forEach((c) => b.extend(c)));
+    map.fitBounds(b, { padding: 60, maxZoom: 15 });
+  }
+});
+</script>
+</body>
+</html>

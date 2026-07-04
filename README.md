@@ -1,29 +1,21 @@
-# OpenStreetMap Mapping Party Kit!
+# Party Kit for OSM
 
-An offline-first mapping party kit for local OpenStreetMap groups. 
+**A collaborative map for OSM mapping parties you can run and share on your laptop**
 
-
-Run it on one laptop, share the URL with the group, and fix the map together!
+Make your mapping party more fun and productive! Share a map from your laptop that empowers
+all mappers to ask questions like "Show me parks that have no benches". The results will pop up instantly, and everyone can be mapping in minutes. Party Kit has 13 built in themes, each with different things to fix. You can filter the results by place, so every mapper can pick their own area to work on. When you build your Kit, a collaborative notepad is automatically created so everyone can share ideas, notes, and progress. While you map, the Kit updates itself every minute, so you can track together how many fixes you have made together! At the end of the party, you can close the Kit, and it will create a summary to share.
 
 ## Make your own
 
-1. Edit `region.json` — the area, boundary admin_level, language, map
-   center. That's the "fill in the area" part. Two ways to give the area:
-   - `area`: a GeoJSON geometry or `[w,s,e,n]` bbox — fetched minutely-fresh
-     from [SliceOSM](https://slice.openstreetmap.us), sized to your party
-     instead of your state. **Use the party city's polygon** (e.g. Nominatim
-     with `polygon_geojson=1`), not a bbox: SliceOSM only includes boundary
-     ways that intersect the area, so a bbox smaller than the city clips its
-     boundary and breaks place assignment. The city's own polygon always
-     survives intact (its boundary ways *are* the area edge).
-   - `extract_url`: a Geofabrik extract URL (used when `area` is absent) —
-     for whole-state parties or when SliceOSM is down.
-2. Optionally edit `web/lang/<lang>.json` — the language dialect: noun labels,
-   UI strings, example sentences. Add a new file for a new language and point
-   `region.json` at it. Tag bundles live in `nouns.yaml` and often deserve
-   regional tuning too.
-3. `./build.sh` (needs cosmo or `COSMO_BIN`, duckdb, curl, python3)
-4. Host the directory on any static server with Range support and open `/web/`.
+1. Edit `region.json`. This is where you select the area to map in, the boundary `admin_level` for picking areas, the Kit's language, and the map
+   center. You can set the area in two ways:
+   - `area`: a GeoJSON geometry or `[w,s,e,n]` bbox, fetched minutely-fresh
+     from [SliceOSM](https://slice.openstreetmap.us). This gives you the most flexibility. Make sure to add some extra space around the area you want to map, so that all the area boundaries are fully included. 
+   - `extract_url`: a [Geofabrik](http://download.geofabrik.de/) extract URL. This is a bit easier but downloads can be large, and processing will take longer.
+2. Optional:
+ - Set the language to one of the supported languages in `region.json`. Look for supported languages in [web/lang]. You can copy an existing file and create your own, too.
+ - Advanced users: you can edit [nouns.yaml] to change the meaning of the themes or even add new ones!
+3. Build your Kit with `./build.sh` (needs cosmo or `COSMO_BIN`, duckdb, curl, python3)
 
 ## Map together (same room)
 
