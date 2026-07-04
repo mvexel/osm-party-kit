@@ -59,7 +59,9 @@
   .hdr-btn { border: 1px solid #555; background: transparent; color: #eee; border-radius: 14px;
              padding: 4px 12px; cursor: pointer; font-size: 13px; }
   .hdr-btn:hover { background: #333; }
-  #draw-btn.active { background: #e91e63; border-color: #e91e63; color: #fff; }
+  .maplibregl-ctrl button.ctrl-emoji { font-size: 16px; }
+  .maplibregl-ctrl button.ctrl-emoji.active { background: #ffe0ec; box-shadow: inset 0 0 0 2px #e91e63; }
+  .maplibregl-ctrl button.ctrl-emoji.off { opacity: .35; }
   #identity-btn { display: none; align-items: center; gap: 6px; }
   .swatch-dot { display: inline-block; width: 12px; height: 12px; border-radius: 999px;
                 border: 1px solid rgba(255,255,255,.75); vertical-align: -1px; }
@@ -99,7 +101,6 @@
   #identity-actions button { border: 1px solid #bbb; background: #fff; border-radius: 14px;
                              padding: 6px 14px; cursor: pointer; }
   #identity-save { background: #1a1a2e !important; color: #fff; border-color: #1a1a2e !important; }
-  #identity-save:disabled { opacity: .45; cursor: not-allowed; }
 </style>
 </head>
 <body>
@@ -108,8 +109,6 @@
   <span id="app-subtitle" style="font-size:13px;opacity:.8"></span>
   <span class="status" id="status"></span>
   <button id="identity-btn" class="hdr-btn"></button>
-  <button id="draw-btn" class="hdr-btn" style="display:none"></button>
-  <button id="undo-btn" class="hdr-btn" style="display:none"></button>
   <button id="share-btn" class="hdr-btn"></button>
 </header>
 <div id="share-panel">
@@ -151,6 +150,7 @@
     <button class="stamp" data-stamp="✅">✅</button>
     <button class="stamp" data-stamp="❓">❓</button>
     <button class="stamp" data-stamp="⚠️">⚠️</button>
+    <button id="undo-btn" style="display:none"></button>
   </div>
 </div>
 <div id="menu"></div>
@@ -476,21 +476,16 @@ function renderIdentitySwatches() {
     identitySwatches.appendChild(b);
   }
 }
-function setIdentityOpen(open, required = false) {
+function setIdentityOpen(open) {
   identityModal.style.display = open ? 'flex' : 'none';
-  identityCancel.style.display = required ? 'none' : '';
   if (!open) return;
   identityDraftColor = myColor;
   identityHandle.value = myHandle;
   renderIdentitySwatches();
-  identitySave.disabled = !identityHandle.value.trim();
   setTimeout(() => identityHandle.focus(), 0);
 }
-identityHandle.oninput = () => identitySave.disabled = !identityHandle.value.trim();
 identitySave.onclick = () => {
-  const handle = identityHandle.value.trim();
-  if (!handle) return;
-  myHandle = handle.slice(0, 24);
+  myHandle = identityHandle.value.trim().slice(0, 24);
   myColor = identityDraftColor;
   localStorage.scribbleHandle = myHandle;
   localStorage.scribbleColor = myColor;
@@ -521,6 +516,10 @@ function addStampImages() {
   }
 }
 
+// One scale pattern for everything we put on the map: full size at z15+,
+// shrinking linearly to a fraction at z9 so symbols don't swamp a zoomed-out view.
+const zoomScale = (min, max) => ['interpolate', ['linear'], ['zoom'], 9, min, 15, max];
+
 const map = new maplibregl.Map({
   container: 'map',
   center: REGION.map_center,
@@ -541,8 +540,8 @@ const mapReady = new Promise((res) => map.on('load', () => {
     paint: { 'line-color': '#666', 'line-width': 1, 'line-dasharray': [3, 2] } });
   map.addSource('dots', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
   map.addLayer({ id: 'dots-circle', type: 'circle', source: 'dots',
-    paint: { 'circle-radius': 5.5, 'circle-color': '#ab47bc', 'circle-opacity': 0.8,
-             'circle-stroke-width': 1, 'circle-stroke-color': '#7b1fa2' } });
+    paint: { 'circle-radius': zoomScale(5, 11), 'circle-color': '#ab47bc', 'circle-opacity': 0.8,
+             'circle-stroke-width': zoomScale(1, 2), 'circle-stroke-color': '#7b1fa2' } });
   map.on('click', 'dots-circle', (e) => {
     const p = e.features[0].properties;
     const osmUrl = `https://www.openstreetmap.org/${p.osm_type}/${p.osm_id}`;
@@ -557,21 +556,25 @@ const mapReady = new Promise((res) => map.on('load', () => {
   map.addSource('scribble-lines', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
   map.addLayer({ id: 'scribbles-line', type: 'line', source: 'scribble-lines',
     layout: { 'line-cap': 'round', 'line-join': 'round' },
-    paint: { 'line-color': ['get', 'c'], 'line-width': 4, 'line-opacity': 0.85 } });
+    paint: { 'line-color': ['get', 'c'], 'line-width': zoomScale(2, 4.5), 'line-opacity': 0.85 } });
   map.addSource('scribble-stamps', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  // The halo: a translucent white disc with a thin ring in the mapper's
+  // colour, hugging the emoji icon (44px at size 1) — attribution without
+  // turning every stamp into a billboard.
   map.addLayer({ id: 'scribble-stamp-rings', type: 'circle', source: 'scribble-stamps',
-    paint: { 'circle-radius': 9, 'circle-color': '#fff', 'circle-opacity': 0.9,
-             'circle-stroke-width': 3, 'circle-stroke-color': ['get', 'c'] } });
+    paint: { 'circle-radius': zoomScale(9, 15), 'circle-color': '#fff', 'circle-opacity': 0.65,
+             'circle-stroke-width': zoomScale(1.5, 2.5), 'circle-stroke-color': ['get', 'c'],
+             'circle-stroke-opacity': 0.9 } });
   // MapLibre renders text-field as SDF glyphs, which don't include colour emoji.
   // Rasterise each emoji via canvas (system emoji font) and use it as an icon.
   addStampImages();
   map.addLayer({ id: 'scribble-stamp-labels', type: 'symbol', source: 'scribble-stamps',
-    layout: { 'icon-image': ['get', 'g'], 'icon-size': 1, 'icon-allow-overlap': true,
+    layout: { 'icon-image': ['get', 'g'], 'icon-size': zoomScale(0.4, 0.65), 'icon-allow-overlap': true,
               'icon-ignore-placement': true } });
   map.addSource('scribble-draft', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
   map.addLayer({ id: 'scribble-draft-line', type: 'line', source: 'scribble-draft',
     layout: { 'line-cap': 'round', 'line-join': 'round' },
-    paint: { 'line-color': myColor, 'line-width': 4, 'line-opacity': 0.6 } });
+    paint: { 'line-color': myColor, 'line-width': zoomScale(2, 4.5), 'line-opacity': 0.6 } });
   res();
 }));
 
@@ -579,13 +582,40 @@ const mapReady = new Promise((res) => map.on('load', () => {
 // Each stroke is one JSON line POSTed to serve.py; everyone polls the
 // append-only JSONL back. Erase = tombstone line. On static hosts the
 // /api/ping probe 404s and the draw tools stay hidden.
-const drawBtn = document.getElementById('draw-btn');
 const undoBtn = document.getElementById('undo-btn');
 const drawToolbar = document.getElementById('draw-toolbar');
 const penTool = document.getElementById('pen-tool');
-let drawMode = false, scribbleOK = false;
+let drawMode = false, scribbleOK = false, scribblesVisible = true;
 let activeTool = 'pen';
 let activeStamp = STAMP_GLYPHS[0];
+
+// Draw on/off and layer show/hide are map context, so they live on the map
+// as a MapLibre control rather than in the page header.
+const SCRIBBLE_LAYERS = ['scribbles-line', 'scribble-stamp-rings', 'scribble-stamp-labels', 'scribble-draft-line'];
+const drawCtrlBtn = document.createElement('button');
+const layerCtrlBtn = document.createElement('button');
+drawCtrlBtn.className = layerCtrlBtn.className = 'ctrl-emoji';
+drawCtrlBtn.type = layerCtrlBtn.type = 'button';
+drawCtrlBtn.textContent = '✏️';
+layerCtrlBtn.textContent = '👁️';
+const scribbleControl = {
+  onAdd() {
+    const div = document.createElement('div');
+    div.className = 'maplibregl-ctrl maplibregl-ctrl-group';
+    div.append(drawCtrlBtn, layerCtrlBtn);
+    return div;
+  },
+  onRemove() {},
+};
+function setScribblesVisible(on) {
+  scribblesVisible = on;
+  layerCtrlBtn.classList.toggle('off', !on);
+  layerCtrlBtn.title = on ? (UI.scribbles_hide ?? 'hide scribbles') : (UI.scribbles_show ?? 'show scribbles');
+  for (const id of SCRIBBLE_LAYERS)
+    map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
+  if (!on && drawMode) setDrawMode(false);
+}
+layerCtrlBtn.onclick = () => setScribblesVisible(!scribblesVisible);
 
 function renderScribbles(text) {
   const strokes = parseScribbles(text);
@@ -620,15 +650,16 @@ function setActiveTool(tool, stamp = activeStamp) {
 }
 function setDrawMode(on) {
   drawMode = on;
-  drawBtn.classList.toggle('active', on);
-  drawBtn.textContent = on ? (UI.drawing ?? 'drawing — tap to stop') : (UI.draw ?? '✏️ draw');
+  if (on && !scribblesVisible) setScribblesVisible(true);
+  drawCtrlBtn.classList.toggle('active', on);
+  drawCtrlBtn.title = on ? (UI.drawing ?? 'drawing — tap to stop') : (UI.draw ?? 'draw');
   drawToolbar.style.display = scribbleOK && on ? 'flex' : 'none';
   const canvas = map.getCanvas();
   canvas.style.cursor = on ? 'crosshair' : '';
   canvas.style.touchAction = on ? 'none' : '';
   on ? map.dragPan.disable() : map.dragPan.enable();
 }
-drawBtn.onclick = () => setDrawMode(!drawMode);
+drawCtrlBtn.onclick = () => setDrawMode(!drawMode);
 undoBtn.onclick = () => {
   const id = mine.pop();
   localStorage.scribbleMine = JSON.stringify(mine);
@@ -691,11 +722,11 @@ mapReady.then(() => {
   try { scribbleOK = (await fetch('../api/ping')).ok; } catch { /* static host */ }
   if (!scribbleOK) return;
   identityBtn.style.display = 'inline-flex';
-  drawBtn.style.display = '';
-  drawBtn.textContent = UI.draw ?? '✏️ draw';
+  drawCtrlBtn.title = UI.draw ?? 'draw';
+  layerCtrlBtn.title = UI.scribbles_hide ?? 'hide scribbles';
   undoBtn.textContent = UI.undo_scribble ?? 'undo my last';
-  if (!myHandle) setIdentityOpen(true, true);
   await mapReady;
+  map.addControl(scribbleControl, 'top-right');
   pollScribbles();
   setInterval(pollScribbles, 3000);
 })();
