@@ -60,7 +60,10 @@ def valid_scribble(msg):
 
 
 class RangeHandler(SimpleHTTPRequestHandler):
-    range = None  # end_headers can run before send_head (e.g. send_error on a bad request)
+    # end_headers can run before send_head or even parse_request has set
+    # these (e.g. send_error on a malformed request line)
+    range = None
+    path = ""
 
     def send_head(self):
         if self.path == "/":
