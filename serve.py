@@ -26,7 +26,6 @@ RANGE_RE = re.compile(r"bytes=(\d*)-(\d*)")
 SCRIBBLES = os.path.join(ROOT, "party", "scribbles.jsonl")
 SCRIBBLE_LOCK = threading.Lock()
 MAX_SCRIBBLE_BYTES = 64 * 1024  # one freehand line; anything bigger is abuse/bug
-STAMP_GLYPHS = {"📍", "✅", "❓", "⚠️"}
 
 
 def parse_port(argv):
@@ -54,7 +53,9 @@ def valid_scribble(msg):
     if not isinstance(pts, list) or not all(valid_point(point) for point in pts):
         return False
     if "g" in msg:
-        return msg["g"] in STAMP_GLYPHS and len(pts) == 1
+        # stamp glyph: structural sanity only — the client decides what
+        # renders; an unknown glyph is a missing icon, not a threat
+        return isinstance(msg["g"], str) and 0 < len(msg["g"]) <= 8 and len(pts) == 1
     return 2 <= len(pts) <= 2000
 
 

@@ -36,7 +36,11 @@ class ValidScribbleTest(unittest.TestCase):
     def test_rejects_wrong_stamp_shape_or_glyph(self):
         base = {"t": "s", "id": "a", "c": "#e91e63"}
         self.assertFalse(valid_scribble({**base, "g": "✅", "pts": [[1, 2], [3, 4]]}))
-        self.assertFalse(valid_scribble({**base, "g": "x", "pts": [[1, 2]]}))
+        self.assertFalse(valid_scribble({**base, "g": 7, "pts": [[1, 2]]}))
+        self.assertFalse(valid_scribble({**base, "g": "", "pts": [[1, 2]]}))
+        self.assertFalse(valid_scribble({**base, "g": "x" * 9, "pts": [[1, 2]]}))
+        # any short string passes — the glyph set is a client-side decision
+        self.assertTrue(valid_scribble({**base, "g": "🌀", "pts": [[1, 2]]}))
 
     def test_rejects_wrong_type(self):
         self.assertFalse(valid_scribble({"t": "x", "id": "a", "c": "#e91e63", "pts": [[1, 2], [3, 4]]}))
