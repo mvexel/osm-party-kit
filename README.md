@@ -1,15 +1,23 @@
-# osmlogo
+# OpenStreetMap Mapping Party Kit!
 
-A LOGO-like constrained query vocabulary over OSM, materialized locally.
-Nouns are curated tag bundles compiled to [cosmo](../cosmo) tables; predicates
-(WITHOUT attr / CONTAINING NO noun / OLDER THAN duration / IN place) run as
-flat column filters over baked GeoParquet — in the browser, via DuckDB-WASM.
-No live services anywhere.
+An offline-first mapping party kit for local OpenStreetMap groups. 
 
-## Deploy your own region
 
-1. Edit `region.json` — extract URL (Geofabrik), boundary admin_level,
-   language, map center. That's the "fill in the area" part.
+Run it on one laptop, share the URL with the group, and fix the map together!
+
+## Make your own
+
+1. Edit `region.json` — the area, boundary admin_level, language, map
+   center. That's the "fill in the area" part. Two ways to give the area:
+   - `area`: a GeoJSON geometry or `[w,s,e,n]` bbox — fetched minutely-fresh
+     from [SliceOSM](https://slice.openstreetmap.us), sized to your party
+     instead of your state. **Use the party city's polygon** (e.g. Nominatim
+     with `polygon_geojson=1`), not a bbox: SliceOSM only includes boundary
+     ways that intersect the area, so a bbox smaller than the city clips its
+     boundary and breaks place assignment. The city's own polygon always
+     survives intact (its boundary ways *are* the area edge).
+   - `extract_url`: a Geofabrik extract URL (used when `area` is absent) —
+     for whole-state parties or when SliceOSM is down.
 2. Optionally edit `web/lang/<lang>.json` — the language dialect: noun labels,
    UI strings, example sentences. Add a new file for a new language and point
    `region.json` at it. Tag bundles live in `nouns.yaml` and often deserve
@@ -35,7 +43,7 @@ internet for map tiles and the CDN-hosted engine.)
 ```
 region.json ─┐
 nouns.yaml ──┴─ build.sh
-                ├─ curl Geofabrik extract        → data/*.osm.pbf
+                ├─ SliceOSM (area) or Geofabrik  → data/*.osm.pbf   (cached; delete to re-fetch)
                 ├─ cosmo convert (filters.yaml)  → out/*.parquet   (~2 min for Utah)
                 └─ duckdb queries/bake.sql       → baked/*.parquet, web/boundaries.geojson, web/places.json
 web/index.html + web/lang/<lang>.json  →  the sentence-builder app
