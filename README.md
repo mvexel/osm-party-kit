@@ -36,15 +36,16 @@ the CDN-hosted engine, and pad.riseup.net.
 
 ## Run with Docker
 
-Build the data first, then package and serve the built Kit:
+No local deps needed — the image carries cosmo, duckdb, curl, and python:
 
 ```
-./build.sh
-docker build -t osmlogo-party .
-docker run --rm -p 8765:8765 -v "$PWD/party:/app/party" osmlogo-party
+docker compose up      # first start bakes the Kit, then serves it
 ```
 
-The bind mount preserves `party/scribbles.jsonl` outside the container.
+Edit `region.json`, `up`. The repo directory is bind-mounted, so the
+extract cache (`data/`), baked assets (`baked/`), and party scribbles
+(`party/`) all persist across `down`/`up`. Rebake by deleting `baked/`
+and restarting.
 
 ## Pipeline
 
@@ -59,38 +60,8 @@ web/index.html + web/report.html + web/lang/<lang>.json  →  the party app
 
 - `nouns.yaml` — the noun dictionary (14 nouns). Tag bundles are editorial
   decisions and the core curated artifact.
-- `queries/demo.sql`, `queries/candidates.sql` — CLI query sets from the
-  design sessions.
-
-## Findings from run 2026-07-03
-
-- MUSEUMS WITHOUT OPENING_HOURS IN SLC: 19 of ~30
-- PARKS CONTAINING NO BENCHES: 1740 / 2033 named parks — but top results are
-  OHV areas and trail systems tagged leisure=park → the PARK noun bundle needs
-  editorial tightening. The noun problem, observed live.
-- PLAYGROUNDS w/o toilet within ~150 m: 2716 / 3251
-- SHOPS OLDER THAN 2 YEARS IN PARK CITY: 36 / 120 (oldest untouched since 2012)
-- CROSSINGS WITHOUT LIT IN SLC: 12,493 — i.e. **zero** crossings have lit=*.
-  100% missing means the query surfaces an unmapped attribute, not a story;
-  candidate for a "not enough signal" guardrail in the UI.
-- BUILDINGS WITHOUT ADDRESS IN SLC: 27,041 / 77,032 (35%)
-- RESTAURANTS EDITED SINCE 1 MONTH: 212 statewide (the positive story)
-
-## Round 2 candidate queries (queries/candidates.sql, run 2026-07-03)
-
-- BUS_STOPS WITHOUT SHELTER: 4800 / 6554 (bench: 5016, unnamed: 240)
-- RESTAURANTS WITHOUT CUISINE: 1139 / 5933
-- RESTAURANTS WITH WEBSITE BUT WITHOUT OPENING_HOURS: 762 (great armchair list)
-- SHOPS WITHOUT NAME: 1067 / 9798
-- SHOPS NEVER EDITED (version=1) AND OLDER THAN 3 YEARS: 1396 — "mapped once
-  and forgotten," incl. supermarkets untouched since 2009
-- CROSSINGS WITHOUT TACTILE_PAVING: 105k / 113k — near-total absence, campaign
-  not story (same guardrail case as lit)
-- SCHOOLS WITH NO CROSSING WITHIN ~150M: 161 / 1286 — safe-routes story
-- DUPLICATE-NAME RESTAURANTS within 100m: 0 (clean, or the check is too strict)
-
-Note: found+fixed a cosmo bug en route — meta:* columns declared type:integer
-were silently written as NULL (string value dropped by typed sink).
+- `docs/NOTES.md` — design-session findings behind the noun bundles, with
+  the CLI query sets in `queries/`.
 
 ## Bake step (queries/bake.sql)
 

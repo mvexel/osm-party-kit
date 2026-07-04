@@ -1,0 +1,10 @@
+# Party up/down: edit region.json, then `docker compose up`.
+# First start bakes (downloads the extract, runs cosmo + duckdb), later
+# starts serve immediately. Everything lands in this directory.
+services:
+  party:
+    build: .
+    ports:
+      - "8765:8765"
+    volumes:
+      - .:/app
