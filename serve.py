@@ -11,6 +11,7 @@ Plain stdlib. Two additions over http.server:
   input all at once. Erasing is a tombstone line, never a rewrite.
 """
 import json
+import math
 import os
 import re
 import socket
@@ -19,16 +20,29 @@ import threading
 import time
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
-PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8765
+PORT = 8765
 ROOT = os.path.dirname(os.path.abspath(__file__))
 RANGE_RE = re.compile(r"bytes=(\d*)-(\d*)")
 SCRIBBLES = os.path.join(ROOT, "party", "scribbles.jsonl")
 SCRIBBLE_LOCK = threading.Lock()
 MAX_SCRIBBLE_BYTES = 64 * 1024  # one freehand line; anything bigger is abuse/bug
+STAMP_GLYPHS = {"📍", "✅", "❓", "⚠️"}
+
+
+def parse_port(argv):
+    return int(argv[1]) if len(argv) > 1 else 8765
+
+
+def valid_point(point):
+    return (
+        isinstance(point, list)
+        and len(point) == 2
+        and all(isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) for v in point)
+    )
 
 
 def valid_scribble(msg):
-    if not isinstance(msg, dict) or not isinstance(msg.get("id"), str) or len(msg["id"]) > 32:
+    if not isinstance(msg, dict) or not isinstance(msg.get("id"), str) or not 0 < len(msg["id"]) <= 32:
         return False
     if msg.get("t") == "e":  # erase tombstone
         return True
@@ -37,9 +51,11 @@ def valid_scribble(msg):
     if not isinstance(msg.get("h", ""), str) or len(msg.get("h", "")) > 24:
         return False  # handle: self-declared name, optional, capped
     pts = msg.get("pts")
-    return (isinstance(pts, list) and 2 <= len(pts) <= 2000 and
-            all(isinstance(p, list) and len(p) == 2 and
-                all(isinstance(v, (int, float)) for v in p) for p in pts))
+    if not isinstance(pts, list) or not all(valid_point(point) for point in pts):
+        return False
+    if "g" in msg:
+        return msg["g"] in STAMP_GLYPHS and len(pts) == 1
+    return 2 <= len(pts) <= 2000
 
 
 class RangeHandler(SimpleHTTPRequestHandler):
@@ -114,6 +130,7 @@ class RangeHandler(SimpleHTTPRequestHandler):
             return
         line = json.dumps({**msg, "ts": round(time.time())}, separators=(",", ":"))
         with SCRIBBLE_LOCK:
+            os.makedirs(os.path.dirname(SCRIBBLES), exist_ok=True)
             with open(SCRIBBLES, "a") as f:
                 f.write(line + "\n")
         self.send_response(204)
@@ -142,6 +159,7 @@ def lan_ip():
 
 
 if __name__ == "__main__":
+    PORT = parse_port(sys.argv)
     os.chdir(ROOT)
     os.makedirs(os.path.dirname(SCRIBBLES), exist_ok=True)
     if not os.path.exists(SCRIBBLES):

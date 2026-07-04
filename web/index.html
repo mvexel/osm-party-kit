@@ -60,6 +60,15 @@
              padding: 4px 12px; cursor: pointer; font-size: 13px; }
   .hdr-btn:hover { background: #333; }
   #draw-btn.active { background: #e91e63; border-color: #e91e63; color: #fff; }
+  #identity-btn { display: none; align-items: center; gap: 6px; }
+  .swatch-dot { display: inline-block; width: 12px; height: 12px; border-radius: 999px;
+                border: 1px solid rgba(255,255,255,.75); vertical-align: -1px; }
+  #draw-toolbar { display: none; padding: 8px 16px; background: #20203a; color: #eee;
+                  gap: 8px; align-items: center; flex-wrap: wrap; border-top: 1px solid #303052; }
+  #draw-toolbar button { border: 1px solid #595978; background: transparent; color: #eee;
+                         border-radius: 14px; padding: 5px 10px; cursor: pointer; font-size: 13px; }
+  #draw-toolbar button.active { background: #fff; color: #1a1a2e; border-color: #fff; }
+  #draw-toolbar .stamp { min-width: 34px; font-size: 16px; line-height: 1; }
   #share-panel { display: none; position: absolute; z-index: 2500; top: 52px; right: 12px;
                  background: #fff; border: 1px solid #ccc; border-radius: 12px; padding: 16px;
                  box-shadow: 0 6px 24px rgba(0,0,0,.18); text-align: center; max-width: 320px; }
@@ -71,6 +80,24 @@
                border-radius: 6px; padding: 5px 7px; background: #fafafa; }
   #share-join { font-family: ui-monospace, monospace; font-size: 24px; font-weight: 800;
                 color: #1a1a2e; margin: 2px 0 10px; word-break: break-all; }
+  #identity-modal { display: none; position: fixed; inset: 0; z-index: 3000;
+                    background: rgba(15,15,25,.55); align-items: center; justify-content: center;
+                    padding: 16px; }
+  #identity-box { width: min(360px, 100%); background: #fff; border-radius: 8px;
+                  box-shadow: 0 16px 48px rgba(0,0,0,.3); padding: 18px; color: #222; }
+  #identity-box h2 { font-size: 18px; margin: 0 0 12px; }
+  #identity-box label { display: block; font-size: 13px; font-weight: 700; margin: 12px 0 6px; color: #444; }
+  #identity-box input { width: 100%; border: 1px solid #bbb; border-radius: 6px;
+                        padding: 9px 10px; font-size: 15px; }
+  #identity-swatches { display: grid; grid-template-columns: repeat(8, 1fr); gap: 8px; }
+  #identity-swatches button { aspect-ratio: 1; border-radius: 999px; border: 3px solid transparent;
+                              cursor: pointer; }
+  #identity-swatches button.active { border-color: #1a1a2e; box-shadow: 0 0 0 2px #fff inset; }
+  #identity-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+  #identity-actions button { border: 1px solid #bbb; background: #fff; border-radius: 14px;
+                             padding: 6px 14px; cursor: pointer; }
+  #identity-save { background: #1a1a2e !important; color: #fff; border-color: #1a1a2e !important; }
+  #identity-save:disabled { opacity: .45; cursor: not-allowed; }
 </style>
 </head>
 <body>
@@ -78,10 +105,18 @@
   <h1 id="app-title">🐢 OSMLOGO</h1>
   <span id="app-subtitle" style="font-size:13px;opacity:.8"></span>
   <span class="status" id="status"></span>
+  <button id="identity-btn" class="hdr-btn"></button>
   <button id="draw-btn" class="hdr-btn" style="display:none"></button>
   <button id="undo-btn" class="hdr-btn" style="display:none"></button>
   <button id="share-btn" class="hdr-btn"></button>
 </header>
+<div id="draw-toolbar">
+  <button id="pen-tool"></button>
+  <button class="stamp" data-stamp="📍">📍</button>
+  <button class="stamp" data-stamp="✅">✅</button>
+  <button class="stamp" data-stamp="❓">❓</button>
+  <button class="stamp" data-stamp="⚠️">⚠️</button>
+</div>
 <div id="share-panel">
   <div class="hint" id="share-join-label"></div>
   <div id="share-join"></div>
@@ -90,6 +125,19 @@
   <input id="share-url" readonly>
   <button id="share-copy"></button>
   <div id="share-links" style="margin-top:10px;font-size:13px"></div>
+</div>
+<div id="identity-modal">
+  <div id="identity-box">
+    <h2 id="identity-title"></h2>
+    <label id="identity-handle-label" for="identity-handle"></label>
+    <input id="identity-handle" maxlength="24" autocomplete="nickname">
+    <label id="identity-color-label"></label>
+    <div id="identity-swatches"></div>
+    <div id="identity-actions">
+      <button id="identity-cancel"></button>
+      <button id="identity-save"></button>
+    </div>
+  </div>
 </div>
 
 <div id="sentence"></div>
@@ -108,6 +156,8 @@
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 <script type="module">
+import { STAMP_GLYPHS, parseScribbles, toFeatures } from './scribbles.js';
+
 // ---------------------------------------------------------------- config (region + language dialect)
 const REGION = await (await fetch('../region.json')).json();
 const LANG = await (await fetch(`lang/${REGION.language}.json`)).json();
@@ -390,7 +440,65 @@ const PALETTE = ['#e91e63', '#2196f3', '#4caf50', '#ff9800', '#9c27b0', '#00bcd4
 let myColor = localStorage.scribbleColor ??
   (localStorage.scribbleColor = PALETTE[Math.floor(Math.random() * PALETTE.length)]);
 let myHandle = localStorage.scribbleHandle ?? '';
-let mine = JSON.parse(localStorage.scribbleMine ?? '[]');
+let mine = [];
+try { mine = JSON.parse(localStorage.scribbleMine ?? '[]'); } catch { mine = []; }
+let identityDraftColor = myColor;
+
+const identityBtn = document.getElementById('identity-btn');
+const identityModal = document.getElementById('identity-modal');
+const identityHandle = document.getElementById('identity-handle');
+const identitySwatches = document.getElementById('identity-swatches');
+const identitySave = document.getElementById('identity-save');
+const identityCancel = document.getElementById('identity-cancel');
+document.getElementById('identity-title').textContent = UI.identity_title ?? 'choose your scribble identity';
+document.getElementById('identity-handle-label').textContent = UI.identity_handle ?? 'handle';
+document.getElementById('identity-color-label').textContent = UI.identity_color ?? 'color';
+identityCancel.textContent = UI.cancel ?? 'cancel';
+identitySave.textContent = UI.save ?? 'save';
+
+function updateIdentityButton() {
+  identityBtn.innerHTML = '';
+  const swatch = document.createElement('span');
+  swatch.className = 'swatch-dot';
+  swatch.style.background = myColor;
+  identityBtn.append(swatch, document.createTextNode(myHandle || (UI.identity_me ?? 'me')));
+}
+function renderIdentitySwatches() {
+  identitySwatches.innerHTML = '';
+  for (const color of PALETTE) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.style.background = color;
+    b.className = color === identityDraftColor ? 'active' : '';
+    b.onclick = () => { identityDraftColor = color; renderIdentitySwatches(); };
+    identitySwatches.appendChild(b);
+  }
+}
+function setIdentityOpen(open, required = false) {
+  identityModal.style.display = open ? 'flex' : 'none';
+  identityCancel.style.display = required ? 'none' : '';
+  if (!open) return;
+  identityDraftColor = myColor;
+  identityHandle.value = myHandle;
+  renderIdentitySwatches();
+  identitySave.disabled = !identityHandle.value.trim();
+  setTimeout(() => identityHandle.focus(), 0);
+}
+identityHandle.oninput = () => identitySave.disabled = !identityHandle.value.trim();
+identitySave.onclick = () => {
+  const handle = identityHandle.value.trim();
+  if (!handle) return;
+  myHandle = handle.slice(0, 24);
+  myColor = identityDraftColor;
+  localStorage.scribbleHandle = myHandle;
+  localStorage.scribbleColor = myColor;
+  updateIdentityButton();
+  if (map?.getLayer?.('scribble-draft-line')) map.setPaintProperty('scribble-draft-line', 'line-color', myColor);
+  setIdentityOpen(false);
+};
+identityCancel.onclick = () => setIdentityOpen(false);
+identityBtn.onclick = () => setIdentityOpen(true);
+updateIdentityButton();
 
 // ---------------------------------------------------------------- map (MapLibre GL)
 const map = new maplibregl.Map({
@@ -426,10 +534,17 @@ const mapReady = new Promise((res) => map.on('load', () => {
   });
   map.on('mouseenter', 'dots-circle', () => map.getCanvas().style.cursor = 'pointer');
   map.on('mouseleave', 'dots-circle', () => map.getCanvas().style.cursor = '');
-  map.addSource('scribbles', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-  map.addLayer({ id: 'scribbles-line', type: 'line', source: 'scribbles',
+  map.addSource('scribble-lines', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  map.addLayer({ id: 'scribbles-line', type: 'line', source: 'scribble-lines',
     layout: { 'line-cap': 'round', 'line-join': 'round' },
     paint: { 'line-color': ['get', 'c'], 'line-width': 4, 'line-opacity': 0.85 } });
+  map.addSource('scribble-stamps', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  map.addLayer({ id: 'scribble-stamp-rings', type: 'circle', source: 'scribble-stamps',
+    paint: { 'circle-radius': 14, 'circle-color': ['get', 'c'], 'circle-opacity': 0.88,
+             'circle-stroke-width': 2, 'circle-stroke-color': '#fff' } });
+  map.addLayer({ id: 'scribble-stamp-labels', type: 'symbol', source: 'scribble-stamps',
+    layout: { 'text-field': ['get', 'g'], 'text-size': 18, 'text-allow-overlap': true,
+              'text-ignore-placement': true } });
   map.addSource('scribble-draft', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
   map.addLayer({ id: 'scribble-draft-line', type: 'line', source: 'scribble-draft',
     layout: { 'line-cap': 'round', 'line-join': 'round' },
@@ -443,25 +558,19 @@ const mapReady = new Promise((res) => map.on('load', () => {
 // /api/ping probe 404s and the draw tools stay hidden.
 const drawBtn = document.getElementById('draw-btn');
 const undoBtn = document.getElementById('undo-btn');
+const drawToolbar = document.getElementById('draw-toolbar');
+const penTool = document.getElementById('pen-tool');
 let drawMode = false, scribbleOK = false;
+let activeTool = 'pen';
+let activeStamp = STAMP_GLYPHS[0];
 
 function renderScribbles(text) {
-  const strokes = new Map();
-  for (const line of text.split('\n')) {
-    if (!line.trim()) continue;
-    try {
-      const m = JSON.parse(line);
-      if (m.t === 's') strokes.set(m.id, m);
-      if (m.t === 'e') strokes.delete(m.id);
-    } catch { /* half-written trailing line — next poll gets it */ }
-  }
-  map.getSource('scribbles')?.setData({ type: 'FeatureCollection',
-    features: [...strokes.values()].map((m) => ({
-      type: 'Feature',
-      geometry: { type: 'LineString', coordinates: m.pts },
-      properties: { c: m.c },
-    })) });
-  mine = mine.filter((id) => strokes.has(id));
+  const strokes = parseScribbles(text);
+  const features = toFeatures(strokes);
+  map.getSource('scribble-lines')?.setData(features.lines);
+  map.getSource('scribble-stamps')?.setData(features.stamps);
+  const liveIds = new Set(strokes.map((s) => s.id));
+  mine = mine.filter((id) => liveIds.has(id));
   localStorage.scribbleMine = JSON.stringify(mine);
   undoBtn.style.display = scribbleOK && mine.length ? '' : 'none';
 }
@@ -473,14 +582,24 @@ async function pollScribbles() {
   } catch { /* server gone — keep last state, retry next tick */ }
 }
 async function postScribble(msg) {
-  await fetch('../api/scribble', { method: 'POST', body: JSON.stringify(msg) });
+  const r = await fetch('../api/scribble', { method: 'POST', body: JSON.stringify(msg) });
+  if (!r.ok) console.warn('scribble rejected', r.status);
   pollScribbles();
 }
 
+function setActiveTool(tool, stamp = activeStamp) {
+  activeTool = tool;
+  activeStamp = stamp;
+  penTool.classList.toggle('active', activeTool === 'pen');
+  document.querySelectorAll('#draw-toolbar .stamp').forEach((b) => {
+    b.classList.toggle('active', activeTool === 'stamp' && b.dataset.stamp === activeStamp);
+  });
+}
 function setDrawMode(on) {
   drawMode = on;
   drawBtn.classList.toggle('active', on);
   drawBtn.textContent = on ? (UI.drawing ?? 'drawing — tap to stop') : (UI.draw ?? '✏️ draw');
+  drawToolbar.style.display = scribbleOK && on ? 'flex' : 'none';
   const canvas = map.getCanvas();
   canvas.style.cursor = on ? 'crosshair' : '';
   canvas.style.touchAction = on ? 'none' : '';
@@ -492,6 +611,13 @@ undoBtn.onclick = () => {
   localStorage.scribbleMine = JSON.stringify(mine);
   if (id) postScribble({ t: 'e', id });
 };
+penTool.textContent = UI.pen_tool ?? 'pen';
+penTool.onclick = () => setActiveTool('pen');
+document.querySelectorAll('#draw-toolbar .stamp').forEach((b) => {
+  b.title = `${UI.stamp_tool ?? 'stamp'} ${b.dataset.stamp}`;
+  b.onclick = () => setActiveTool('stamp', b.dataset.stamp);
+});
+setActiveTool('pen');
 
 let stroke = null, lastPx = null;
 const px2ll = (e) => {
@@ -508,6 +634,13 @@ mapReady.then(() => {
   canvas.addEventListener('pointerdown', (e) => {
     if (!drawMode || !e.isPrimary) return;
     e.preventDefault();
+    if (activeTool === 'stamp') {
+      const id = [...crypto.getRandomValues(new Uint8Array(4))].map((b) => b.toString(16).padStart(2, '0')).join('');
+      mine.push(id);
+      localStorage.scribbleMine = JSON.stringify(mine);
+      postScribble({ t: 's', id, c: myColor, h: myHandle, g: activeStamp, pts: [px2ll(e)] });
+      return;
+    }
     canvas.setPointerCapture(e.pointerId);
     stroke = [px2ll(e)];
     lastPx = [e.clientX, e.clientY];
@@ -528,15 +661,17 @@ mapReady.then(() => {
     const id = [...crypto.getRandomValues(new Uint8Array(4))].map((b) => b.toString(16).padStart(2, '0')).join('');
     mine.push(id);
     localStorage.scribbleMine = JSON.stringify(mine);
-    postScribble({ t: 's', id, c: myColor, pts });
+    postScribble({ t: 's', id, c: myColor, h: myHandle, pts });
   });
 });
 (async () => {
   try { scribbleOK = (await fetch('../api/ping')).ok; } catch { /* static host */ }
   if (!scribbleOK) return;
+  identityBtn.style.display = 'inline-flex';
   drawBtn.style.display = '';
   drawBtn.textContent = UI.draw ?? '✏️ draw';
   undoBtn.textContent = UI.undo_scribble ?? 'undo my last';
+  if (!myHandle) setIdentityOpen(true, true);
   await mapReady;
   pollScribbles();
   setInterval(pollScribbles, 3000);

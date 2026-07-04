@@ -3,3 +3,6 @@ out/
 baked/
 party/
 web/party.json
+__pycache__/
+*.pyc
+node_modules/

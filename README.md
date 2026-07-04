@@ -3,18 +3,19 @@
 **A collaborative map for OSM mapping parties you can run and share on your laptop**
 
 Make your mapping party more fun and productive! Share a map from your laptop that empowers
-all mappers to ask questions like "Show me parks that have no benches". The results will pop up instantly, and everyone can be mapping in minutes. Party Kit has 13 built in themes, each with different things to fix. You can filter the results by place, so every mapper can pick their own area to work on. When you build your Kit, a collaborative notepad is automatically created so everyone can share ideas, notes, and progress. While you map, the Kit updates itself every minute, so you can track together how many fixes you have made together! At the end of the party, you can close the Kit, and it will create a summary to share.
+all mappers to ask questions like "Show me parks that have no benches".
+The results pop up instantly, and everyone can draw on the same shared map:
+circle blocks, stamp fixed/question/problem marks, keep notes in a shared pad,
+and open a printable party report at the end.
 
 ## Make your own
 
-1. Edit `region.json`. This is where you select the area to map in, the boundary `admin_level` for picking areas, the Kit's language, and the map
-   center. You can set the area in two ways:
-   - `area`: a GeoJSON geometry or `[w,s,e,n]` bbox, fetched minutely-fresh
-     from [SliceOSM](https://slice.openstreetmap.us). This gives you the most flexibility. Make sure to add some extra space around the area you want to map, so that all the area boundaries are fully included. 
-   - `extract_url`: a [Geofabrik](http://download.geofabrik.de/) extract URL. This is a bit easier but downloads can be large, and processing will take longer.
+1. Edit `region.json`. This is where you select the Geofabrik `extract_url`,
+   boundary `admin_level` for picking places, language, and map center.
+   Advanced users can point `extract_url` at any compatible `.osm.pbf`.
 2. Optional:
- - Set the language to one of the supported languages in `region.json`. Look for supported languages in [web/lang]. You can copy an existing file and create your own, too.
- - Advanced users: you can edit [nouns.yaml] to change the meaning of the themes or even add new ones!
+ - Set the language to one of the supported languages in `region.json`. Look for supported languages in `web/lang/`. You can copy an existing file and create your own, too.
+ - Edit `nouns.yaml` to tune the themes or add new ones.
 3. Build your Kit with `./build.sh` (needs cosmo or `COSMO_BIN`, duckdb, curl, python3)
 
 ## Map together (same room)
@@ -24,21 +25,36 @@ python3 serve.py        # prints http://<your-lan-ip>:8765/web/
 ```
 
 Everyone on the same network opens that URL — each browser runs its own
-DuckDB-WASM against the same baked data; there is no shared server state.
+DuckDB-WASM against the same baked data. `serve.py` is also the tiny shared
+scribble hub: it appends posted lines/stamps to `party/scribbles.jsonl`, and
+clients poll that file every few seconds.
 The sentence lives in the URL hash, so any query is a shareable link: the
 **share** button shows a QR + copy-link for the room, and pasting a shared
-link into an already-open tab takes effect immediately. (Clients still need
-internet for map tiles and the CDN-hosted engine.)
+link into an already-open tab takes effect immediately. The share panel also
+links to the party pad and report. Clients still need internet for map tiles,
+the CDN-hosted engine, and pad.riseup.net.
+
+## Run with Docker
+
+Build the data first, then package and serve the built Kit:
+
+```
+./build.sh
+docker build -t osmlogo-party .
+docker run --rm -p 8765:8765 -v "$PWD/party:/app/party" osmlogo-party
+```
+
+The bind mount preserves `party/scribbles.jsonl` outside the container.
 
 ## Pipeline
 
 ```
 region.json ─┐
 nouns.yaml ──┴─ build.sh
-                ├─ SliceOSM (area) or Geofabrik  → data/*.osm.pbf   (cached; delete to re-fetch)
+                ├─ Geofabrik extract             → data/*.osm.pbf   (cached; delete to re-fetch)
                 ├─ cosmo convert (filters.yaml)  → out/*.parquet   (~2 min for Utah)
                 └─ duckdb queries/bake.sql       → baked/*.parquet, web/boundaries.geojson, web/places.json
-web/index.html + web/lang/<lang>.json  →  the sentence-builder app
+web/index.html + web/report.html + web/lang/<lang>.json  →  the party app
 ```
 
 - `nouns.yaml` — the noun dictionary (14 nouns). Tag bundles are editorial
@@ -97,22 +113,24 @@ demo query results exactly (19 / 1740 / 2716 / 161 / 36 / 27041).
 ## Web app (web/index.html)
 
 Sentence-builder UI: "Show me [NOUN] [predicate chips] [in PLACE]" over the
-baked parquet. DuckDB-WASM (CDN) + MapLibre GL JS, no server-side anything.
+baked parquet. DuckDB-WASM (CDN) + MapLibre GL JS, with `serve.py` adding
+Range support and the optional LAN scribble API.
 
 ```
-python3 -m http.server 8017    # from the osmlogo dir
-open http://localhost:8017/web/
+python3 serve.py
+open http://localhost:8765/web/
 ```
 
 - Live counts in the + add picker (the answer arrives before the question)
 - Guardrail banner when >95% of features miss an attribute (campaign, not gap)
 - Dots capped at 2000; popups link to osm.org and "fix in iD"
 - Query state serializes to the URL hash — shareable sentences
+- Draw mode adds shared freehand lines and emoji stamps when served by `serve.py`
+- `web/report.html` renders the final scribbles and contributor counts for printing
 - Verified end-to-end with headless Chrome: SLC museums = 19, parks = 1740,
   matching the DuckDB baselines exactly
-- python http.server lacks Range support so duckdb-wasm falls back to full
-  file reads; any real static host (nginx, GitHub Pages, Caddy) does partial
-  reads and only touches the row groups it needs
+- Plain static hosting still works for query/view mode, but draw tools are
+  hidden because there is no `/api/scribble` endpoint.
 
 ## Known v0 warts
 

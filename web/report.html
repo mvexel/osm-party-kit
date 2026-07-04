@@ -16,10 +16,25 @@
   header a { color: #9ecbff; font-size: 13px; }
   header button { margin-left: auto; border: 1px solid #555; background: transparent; color: #eee;
                   border-radius: 14px; padding: 4px 12px; cursor: pointer; font-size: 13px; }
+  main { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 260px; }
   #map { flex: 1; min-height: 0; }
+  #contributors { border-left: 1px solid #ddd; padding: 12px; overflow: auto; background: #fafafa; }
+  #contributors h2 { margin: 0 0 10px; font-size: 14px; color: #333; }
+  .contrib { display: flex; align-items: center; gap: 8px; justify-content: space-between;
+             padding: 6px 0; border-bottom: 1px solid #eee; font-size: 13px; }
+  .contrib .who { display: inline-flex; align-items: center; gap: 7px; min-width: 0; }
+  .swatch { width: 12px; height: 12px; border-radius: 999px; flex: 0 0 auto; }
+  .handle { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .count { color: #777; font-variant-numeric: tabular-nums; }
   #empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
            font-size: 16px; color: #555; background: rgba(255,255,255,.7); z-index: 10; }
+  @media (max-width: 720px) {
+    main { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; }
+    #contributors { border-left: 0; border-top: 1px solid #ddd; max-height: 32vh; }
+  }
   @media print {
+    body { height: auto; }
+    main { height: 90vh; grid-template-columns: minmax(0, 1fr) 230px; }
     header button { display: none; }
     .maplibregl-ctrl { display: none !important; }
   }
@@ -32,16 +47,25 @@
   <span id="pad"></span>
   <button id="print-btn" onclick="print()"></button>
 </header>
-<div style="position:relative;flex:1;display:flex;min-height:0">
-  <div id="map"></div>
-  <div id="empty" style="display:none"></div>
-</div>
+<main>
+  <div style="position:relative;display:flex;min-height:0">
+    <div id="map"></div>
+    <div id="empty" style="display:none"></div>
+  </div>
+  <aside id="contributors">
+    <h2 id="contributors-title"></h2>
+    <div id="contributors-list"></div>
+  </aside>
+</main>
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script type="module">
+import { parseScribbles, toFeatures } from './scribbles.js';
+
 const REGION = await (await fetch('../region.json')).json();
 const UI = (await (await fetch(`lang/${REGION.language}.json`)).json()).ui;
 document.getElementById('title').textContent = `🖍️ ${UI.report_title ?? 'party report'} — ${REGION.name}`;
 document.getElementById('print-btn').textContent = UI.report_print ?? 'print / save as PDF';
+document.getElementById('contributors-title').textContent = UI.report_contributors ?? 'contributors';
 document.title = `${UI.report_title ?? 'party report'} — ${REGION.name}`;
 
 try {
@@ -50,35 +74,52 @@ try {
     `<a href="${party.pad_url}" target="_blank">📝 ${UI.pad_link ?? 'party pad'}</a>`;
 } catch { /* no party.json */ }
 
-const strokes = new Map();
+let strokes = [];
 try {
   const text = await (await fetch(`../party/scribbles.jsonl?t=${Date.now()}`)).text();
-  for (const line of text.split('\n')) {
-    if (!line.trim()) continue;
-    try {
-      const m = JSON.parse(line);
-      if (m.t === 's') strokes.set(m.id, m);
-      if (m.t === 'e') strokes.delete(m.id);
-    } catch { /* skip bad line */ }
-  }
+  strokes = parseScribbles(text);
 } catch { /* no scribble file (static host) */ }
 
-const feats = [...strokes.values()].map((m) => ({
-  type: 'Feature',
-  geometry: { type: 'LineString', coordinates: m.pts },
-  properties: { c: m.c },
-}));
-const colors = new Set([...strokes.values()].map((m) => m.c));
-const times = [...strokes.values()].map((m) => m.ts * 1000).filter(Boolean).sort((a, b) => a - b);
+const features = toFeatures(strokes);
+const scribbleCount = features.lines.features.length + features.stamps.features.length;
+const contributors = new Map();
+const unknownContributor = UI.report_unknown ?? 'unknown';
+for (const stroke of strokes) {
+  const handle = stroke.h || unknownContributor;
+  const key = `${handle}\u0000${stroke.c}`;
+  const prev = contributors.get(key) ?? { h: handle, c: stroke.c, count: 0 };
+  prev.count += 1;
+  contributors.set(key, prev);
+}
+const times = strokes.map((m) => m.ts * 1000).filter(Boolean).sort((a, b) => a - b);
 const fmt = (t) => new Date(t).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
-document.getElementById('stats').textContent = feats.length
-  ? `${feats.length} ${UI.report_scribbles ?? 'scribbles'} · ${colors.size} ${UI.report_colors ?? 'colors'}` +
+document.getElementById('stats').textContent = scribbleCount
+  ? `${scribbleCount} ${UI.report_scribbles ?? 'scribbles'} · ${contributors.size} ${UI.report_contributors ?? 'contributors'}` +
     (times.length ? ` · ${UI.report_between ?? 'drawn between'} ${fmt(times[0])} — ${fmt(times.at(-1))}` : '')
   : '';
-if (!feats.length) {
+if (!scribbleCount) {
   const empty = document.getElementById('empty');
   empty.style.display = 'flex';
   empty.textContent = UI.report_none ?? 'no scribbles yet — go draw on the map!';
+}
+const list = document.getElementById('contributors-list');
+for (const contributor of [...contributors.values()].sort((a, b) => b.count - a.count || a.h.localeCompare(b.h))) {
+  const row = document.createElement('div');
+  row.className = 'contrib';
+  const who = document.createElement('span');
+  who.className = 'who';
+  const swatch = document.createElement('span');
+  swatch.className = 'swatch';
+  swatch.style.background = contributor.c;
+  const handle = document.createElement('span');
+  handle.className = 'handle';
+  handle.textContent = contributor.h;
+  const count = document.createElement('span');
+  count.className = 'count';
+  count.textContent = contributor.count.toLocaleString();
+  who.append(swatch, handle);
+  row.append(who, count);
+  list.appendChild(row);
 }
 
 const map = new maplibregl.Map({
@@ -96,13 +137,21 @@ const map = new maplibregl.Map({
 });
 map.addControl(new maplibregl.NavigationControl(), 'top-right');
 map.on('load', () => {
-  map.addSource('scribbles', { type: 'geojson', data: { type: 'FeatureCollection', features: feats } });
-  map.addLayer({ id: 'scribbles-line', type: 'line', source: 'scribbles',
+  map.addSource('scribble-lines', { type: 'geojson', data: features.lines });
+  map.addLayer({ id: 'scribbles-line', type: 'line', source: 'scribble-lines',
     layout: { 'line-cap': 'round', 'line-join': 'round' },
     paint: { 'line-color': ['get', 'c'], 'line-width': 4, 'line-opacity': 0.9 } });
-  if (feats.length) {
+  map.addSource('scribble-stamps', { type: 'geojson', data: features.stamps });
+  map.addLayer({ id: 'scribble-stamp-rings', type: 'circle', source: 'scribble-stamps',
+    paint: { 'circle-radius': 14, 'circle-color': ['get', 'c'], 'circle-opacity': 0.88,
+             'circle-stroke-width': 2, 'circle-stroke-color': '#fff' } });
+  map.addLayer({ id: 'scribble-stamp-labels', type: 'symbol', source: 'scribble-stamps',
+    layout: { 'text-field': ['get', 'g'], 'text-size': 18, 'text-allow-overlap': true,
+              'text-ignore-placement': true } });
+  if (scribbleCount) {
     const b = new maplibregl.LngLatBounds();
-    feats.forEach((f) => f.geometry.coordinates.forEach((c) => b.extend(c)));
+    features.lines.features.forEach((f) => f.geometry.coordinates.forEach((c) => b.extend(c)));
+    features.stamps.features.forEach((f) => b.extend(f.geometry.coordinates));
     map.fitBounds(b, { padding: 60, maxZoom: 15 });
   }
 });
