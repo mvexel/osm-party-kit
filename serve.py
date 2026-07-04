@@ -82,9 +82,10 @@ def lan_ip():
 
 if __name__ == "__main__":
     os.chdir(ROOT)
-    url = f"http://{lan_ip()}:{PORT}/web/"
+    host = socket.gethostname().removesuffix(".local").lower()
     print(f"\n  🐢 osmlogo is up — everyone on this network can join:\n")
-    print(f"     {url}\n")
-    print("  (open it yourself and hit 'share' to show a QR for the room)")
+    print(f"     http://{host}.local:{PORT}/web/   (type this on laptops — mDNS)")
+    print(f"     http://{lan_ip()}:{PORT}/web/   (fallback if .local doesn't resolve)\n")
+    print("  (open it yourself and hit 'share' to show a QR for phones)")
     print("  Ctrl-C to stop.\n")
     ThreadingHTTPServer(("", PORT), RangeHandler).serve_forever()
