@@ -1,5 +1,9 @@
 export const STAMP_GLYPHS = ['📍', '✅', '❓', '⚠️'];
 
+// Text scribbles render as a rasterised icon (no glyph pipeline in the style),
+// so both the feature and the canvas image agree on this deterministic id.
+export const textImageKey = (c, text) => `tx:${c}:${text}`;
+
 const emptyCollection = () => ({ type: 'FeatureCollection', features: [] });
 
 export function parseScribbles(text) {
@@ -28,7 +32,13 @@ export function toFeatures(strokes) {
       h: stroke.h ?? '',
       ts: stroke.ts ?? null,
     };
-    if (stroke.g) {
+    if (stroke.tx) {
+      stamps.features.push({
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: stroke.pts[0] },
+        properties: { ...props, g: textImageKey(stroke.c, stroke.tx) },
+      });
+    } else if (stroke.g) {
       stamps.features.push({
         type: 'Feature',
         geometry: { type: 'Point', coordinates: stroke.pts[0] },

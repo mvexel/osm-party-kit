@@ -43,6 +43,8 @@
     "scribbles_hide": "hide scribbles",
     "pen_tool": "pen",
     "stamp_tool": "stamp",
+    "text_tool": "text",
+    "text_prompt": "text label:",
     "undo_scribble": "undo my last",
     "identity_title": "choose your scribble identity",
     "identity_handle": "handle — optional",

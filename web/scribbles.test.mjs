@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { parseScribbles, toFeatures } from './scribbles.js';
+import { parseScribbles, toFeatures, textImageKey } from './scribbles.js';
 
 const line = (id, pts = [[1, 2], [3, 4]], extra = {}) =>
   JSON.stringify({ t: 's', id, c: '#e91e63', h: 'Ada', pts, ...extra });
@@ -49,4 +49,12 @@ test('stamps are routed to point features', () => {
   assert.equal(features.stamps.features.length, 1);
   assert.equal(features.stamps.features[0].geometry.type, 'Point');
   assert.equal(features.stamps.features[0].properties.g, '📍');
+});
+
+test('text labels become point features keyed by their image id', () => {
+  const features = toFeatures(parseScribbles(line('lbl', [[1, 2]], { tx: 'gap here' })));
+  assert.equal(features.lines.features.length, 0);
+  assert.equal(features.stamps.features.length, 1);
+  assert.equal(features.stamps.features[0].geometry.type, 'Point');
+  assert.equal(features.stamps.features[0].properties.g, textImageKey('#e91e63', 'gap here'));
 });

@@ -56,6 +56,10 @@ def valid_scribble(msg):
         # stamp glyph: structural sanity only — the client decides what
         # renders; an unknown glyph is a missing icon, not a threat
         return isinstance(msg["g"], str) and 0 < len(msg["g"]) <= 8 and len(pts) == 1
+    if "tx" in msg:
+        # text label: single point, capped length; rendered client-side as a
+        # rasterised icon, so like a glyph it's structural sanity only
+        return isinstance(msg["tx"], str) and 0 < len(msg["tx"]) <= 40 and len(pts) == 1
     return 2 <= len(pts) <= 2000
 
 
