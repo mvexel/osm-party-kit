@@ -68,14 +68,17 @@
   #identity-btn { display: none; align-items: center; gap: 6px; }
   .swatch-dot { display: inline-block; width: 12px; height: 12px; border-radius: 999px;
                 border: 1px solid rgba(255,255,255,.75); vertical-align: -1px; }
-  #draw-toolbar { display: none; position: absolute; z-index: 1700; left: 12px; bottom: 18px;
-                  background: rgba(255,255,255,.94); color: #222; border: 1px solid #ccc;
-                  border-radius: 8px; box-shadow: 0 4px 18px rgba(0,0,0,.18); padding: 6px;
-                  gap: 6px; align-items: center; flex-wrap: wrap; max-width: calc(100vw - 24px); }
-  #draw-toolbar button { border: 1px solid #ccc; background: #fff; color: #222;
-                         border-radius: 6px; padding: 6px 10px; cursor: pointer; font-size: 13px; }
-  #draw-toolbar button.active { background: #1a1a2e; color: #fff; border-color: #1a1a2e; }
-  #draw-toolbar .stamp { width: 36px; height: 34px; padding: 0; font-size: 18px; line-height: 1; }
+  #draw-toolbar { display: none; position: absolute; z-index: 1700; right: 10px; top: 208px;
+                  flex-direction: column; background: #fff; border: 1px solid #ddd;
+                  border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,.2); overflow: hidden; }
+  #draw-toolbar button { width: 44px; height: 44px; padding: 0; border: none; background: #fff;
+                         color: #222; cursor: pointer; font-size: 20px; line-height: 1;
+                         border-bottom: 1px solid #eee; }
+  #draw-toolbar button:first-child { border-top-left-radius: 9px; border-top-right-radius: 9px; }
+  #draw-toolbar button:last-child { border-bottom: none;
+                                    border-bottom-left-radius: 9px; border-bottom-right-radius: 9px; }
+  #draw-toolbar button:hover { background: #f4f4f4; }
+  #draw-toolbar button.active { background: #ffe0ec; box-shadow: inset 0 0 0 2px #e91e63; }
   #share-panel { display: none; position: absolute; z-index: 2500; top: 52px; right: 12px;
                  background: #fff; border: 1px solid #ccc; border-radius: 12px; padding: 16px;
                  box-shadow: 0 6px 24px rgba(0,0,0,.18); text-align: center; max-width: 320px; }
@@ -154,7 +157,7 @@
     <button class="stamp" data-stamp="✅">✅</button>
     <button class="stamp" data-stamp="❓">❓</button>
     <button class="stamp" data-stamp="⚠️">⚠️</button>
-    <button id="undo-btn" style="display:none"></button>
+    <button id="undo-btn" class="stamp" style="display:none">↶</button>
   </div>
 </div>
 <div id="menu"></div>
@@ -663,7 +666,8 @@ undoBtn.onclick = () => {
   localStorage.scribbleMine = JSON.stringify(mine);
   if (id) postScribble({ t: 'e', id });
 };
-penTool.textContent = UI.pen_tool ?? 'pen';
+penTool.textContent = '✏️';
+penTool.title = UI.pen_tool ?? 'pen';
 penTool.onclick = () => setActiveTool('pen');
 document.querySelectorAll('#draw-toolbar .stamp').forEach((b) => {
   b.title = `${UI.stamp_tool ?? 'stamp'} ${b.dataset.stamp}`;
@@ -723,7 +727,7 @@ mapReady.then(() => {
   identityBtn.style.display = 'inline-flex';
   drawCtrlBtn.title = UI.draw ?? 'draw';
   layerCtrlBtn.title = UI.scribbles_hide ?? 'hide scribbles';
-  undoBtn.textContent = UI.undo_scribble ?? 'undo my last';
+  undoBtn.title = UI.undo_scribble ?? 'undo my last';
   await mapReady;
   map.addControl(scribbleControl, 'top-right');
   pollScribbles();
