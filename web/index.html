@@ -1240,18 +1240,37 @@
                             "line-opacity": 0.6,
                         },
                     });
-                    // Tap a scribble to see who drew it. The handle + colour ride
-                    // along on every feature already — this just surfaces them.
-                    // Muted while drawing so a tap places a mark, not a popup.
+                    // Tap a scribble to see who drew it, and how long ago. The
+                    // handle, colour and server ts all ride on every feature
+                    // already — this just surfaces them. Muted while drawing so
+                    // a tap places a mark, not a popup.
+                    const rtf = new Intl.RelativeTimeFormat(
+                        REGION.language || "en",
+                        { numeric: "always" },
+                    );
+                    const timeAgo = (ts) => {
+                        if (!ts) return "";
+                        const s = Math.round(Date.now() / 1000) - ts;
+                        if (s < 45) return UI.scribble_now ?? "just now";
+                        const [unit, div] =
+                            s < 3600
+                                ? ["minute", 60]
+                                : s < 86400
+                                  ? ["hour", 3600]
+                                  : ["day", 86400];
+                        return rtf.format(-Math.round(s / div), unit);
+                    };
                     for (const layer of ["scribbles-line", "scribble-stamp-labels"]) {
                         map.on("click", layer, (e) => {
                             if (drawMode) return;
                             const p = e.features[0].properties;
                             const who = p.h || (UI.scribble_anon ?? "someone");
+                            const ago = timeAgo(p.ts);
                             new maplibregl.Popup()
                                 .setLngLat(e.lngLat)
                                 .setHTML(
-                                    `<span class="swatch-dot" style="background:${p.c}"></span> ${who}`,
+                                    `<span class="swatch-dot" style="background:${p.c}"></span> ${who}` +
+                                        (ago ? `<br><small>${ago}</small>` : ""),
                                 )
                                 .addTo(map);
                         });
