@@ -671,7 +671,7 @@ function setActiveTool(tool, stamp = activeStamp) {
   activeStamp = stamp;
   penTool.classList.toggle('active', activeTool === 'pen');
   textTool.classList.toggle('active', activeTool === 'text');
-  document.querySelectorAll('#draw-toolbar .stamp').forEach((b) => {
+  document.querySelectorAll('#draw-toolbar .stamp[data-stamp]').forEach((b) => {
     b.classList.toggle('active', activeTool === 'stamp' && b.dataset.stamp === activeStamp);
   });
 }
@@ -698,7 +698,7 @@ penTool.title = UI.pen_tool ?? 'pen';
 penTool.onclick = () => setActiveTool('pen');
 textTool.title = UI.text_tool ?? 'text';
 textTool.onclick = () => setActiveTool('text');
-document.querySelectorAll('#draw-toolbar .stamp').forEach((b) => {
+document.querySelectorAll('#draw-toolbar .stamp[data-stamp]').forEach((b) => {
   b.title = `${UI.stamp_tool ?? 'stamp'} ${b.dataset.stamp}`;
   b.onclick = () => setActiveTool('stamp', b.dataset.stamp);
 });
