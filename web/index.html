@@ -23,6 +23,13 @@
                 flex-direction: column;
                 height: 100vh;
             }
+            /* one light bg for the whole top stack, no dividers */
+            #sentence,
+            #count-line,
+            #banner,
+            #examples {
+                background: #f7f7fb;
+            }
             header {
                 padding: 10px 16px;
                 background: #1a1a2e;
@@ -44,13 +51,11 @@
                 margin-left: auto;
             }
             #sentence {
-                padding: 14px 16px;
-                background: #f4f4f8;
+                padding: 14px 16px 16px;
                 display: flex;
                 align-items: center;
                 gap: 8px;
                 flex-wrap: wrap;
-                border-bottom: 1px solid #ddd;
                 font-size: 17px;
             }
             .lead {
@@ -126,9 +131,7 @@
                 color: #e91e63;
             }
             #count-line {
-                padding: 10px 16px;
-                background: #fff;
-                border-bottom: 1px solid #eee;
+                padding: 10px 16px 12px;
                 display: flex;
                 align-items: baseline;
                 gap: 10px;
@@ -145,16 +148,12 @@
             }
             #banner {
                 display: none;
-                padding: 8px 16px;
-                background: #fff3cd;
-                color: #664d03;
+                padding: 8px 16px 10px;
+                color: #9a7b1a;
                 font-size: 14px;
-                border-bottom: 1px solid #ffe69c;
             }
             #examples {
-                padding: 8px 16px;
-                background: #fafafa;
-                border-bottom: 1px solid #eee;
+                padding: 8px 16px 10px;
                 font-size: 13px;
                 color: #666;
                 display: flex;
