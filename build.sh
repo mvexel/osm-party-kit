@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# osmlogo build: region.json + nouns.yaml -> baked parquet + web assets.
-# Usage: ./build.sh          (uses region.json in this directory)
+# osmlogo build: party.json + nouns.yaml -> baked parquet + web assets.
+# Usage: ./build.sh          (uses party.json in this directory)
 # Requires: cosmo (or set COSMO_BIN), duckdb, python3, curl.
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -9,10 +9,10 @@ COSMO_BIN="${COSMO_BIN:-cosmo}"
 command -v "$COSMO_BIN" >/dev/null || { echo "cosmo not found — install it or set COSMO_BIN"; exit 1; }
 command -v duckdb >/dev/null || { echo "duckdb not found"; exit 1; }
 
-region() { python3 -c "import json;v=json.load(open('region.json')).get('$1','');print(v if isinstance(v,str) else __import__('json').dumps(v))"; }
-NAME=$(region name)
-URL=$(region extract_url)
-ADMIN_LEVEL=$(region admin_level)
+party() { python3 -c "import json;v=json.load(open('party.json')).get('$1','');print(v if isinstance(v,str) else __import__('json').dumps(v))"; }
+NAME=$(party name)
+URL=$(party extract_url)
+ADMIN_LEVEL=$(party admin_level)
 
 echo "== osmlogo build: $NAME (admin_level=$ADMIN_LEVEL) =="
 

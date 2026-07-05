@@ -61,12 +61,12 @@
 <script type="module">
 import { parseScribbles, toFeatures } from './scribbles.js';
 
-const REGION = await (await fetch('../region.json')).json();
-const UI = (await (await fetch(`lang/${REGION.language}.json`)).json()).ui;
-document.getElementById('title').textContent = `🖍️ ${UI.report_title ?? 'party report'} — ${REGION.name}`;
+const PARTY = await (await fetch('../party.json')).json();
+const UI = (await (await fetch(`lang/${PARTY.language}.json`)).json()).ui;
+document.getElementById('title').textContent = `🖍️ ${UI.report_title ?? 'party report'} — ${PARTY.name}`;
 document.getElementById('print-btn').textContent = UI.report_print ?? 'print / save as PDF';
 document.getElementById('contributors-title').textContent = UI.report_contributors ?? 'contributors';
-document.title = `${UI.report_title ?? 'party report'} — ${REGION.name}`;
+document.title = `${UI.report_title ?? 'party report'} — ${PARTY.name}`;
 
 try {
   const party = await (await fetch('party.json')).json();

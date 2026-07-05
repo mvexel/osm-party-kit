@@ -1,5 +1,7 @@
 {
   "name": "Utah",
+  "title": "Salt Lake Map Night August 2026",
+  "subtitle": "Giving this thing a try",
   "extract_url": "https://download.geofabrik.de/north-america/us/utah-latest.osm.pbf",
   "admin_level": 8,
   "language": "en",

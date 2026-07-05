@@ -512,9 +512,9 @@
             } from "./scribbles.js";
 
             // ---------------------------------------------------------------- config (region + language dialect)
-            const REGION = await (await fetch("../region.json")).json();
+            const PARTY = await (await fetch("../party.json")).json();
             const LANG = await (
-                await fetch(`lang/${REGION.language}.json`)
+                await fetch(`lang/${PARTY.language}.json`)
             ).json();
             const {
                 ui: UI,
@@ -524,11 +524,11 @@
             } = LANG;
             const MAX_DOTS = 2000;
 
-            document.getElementById("app-title").textContent = `${UI.title}`;
-            document.getElementById("app-subtitle").textContent = `${UI.subtitle}`;
+            document.getElementById("app-title").textContent = `${PARTY.title}`;
+            document.getElementById("app-subtitle").textContent = `${PARTY.subtitle}`;
             document.getElementById("try-label").textContent = UI.try;
             document.getElementById("loading-overlay").textContent = UI.loading;
-            document.title = `${UI.title.toLowerCase()} — ${REGION.name}`;
+            document.title = `${PARTY.title.toLowerCase()} — ${PARTY.name}`;
 
             // ---------------------------------------------------------------- state
             let state = structuredClone(EXAMPLES[0].state);
@@ -1117,8 +1117,8 @@
 
             const map = new maplibregl.Map({
                 container: "map",
-                center: REGION.map_center,
-                zoom: REGION.map_zoom,
+                center: PARTY.map_center,
+                zoom: PARTY.map_zoom,
                 style: {
                     version: 8,
                     sources: {
@@ -1245,7 +1245,7 @@
                     // already — this just surfaces them. Muted while drawing so
                     // a tap places a mark, not a popup.
                     const rtf = new Intl.RelativeTimeFormat(
-                        REGION.language || "en",
+                        PARTY.language || "en",
                         { numeric: "always" },
                     );
                     const timeAgo = (ts) => {

@@ -1,8 +1,8 @@
 # osmlogo — project scope
 
-A party kit: anyone can bake a kit for their own region and host a mapping
+A party kit: anyone can bake a kit for their own party and host a mapping
 party — one room, one laptop on a hotspot, one evening. Two audiences:
-the host who sets it up (region.json, nouns.yaml, lang/, build.sh) and the
+the host who sets it up (party.json, nouns.yaml, lang/, build.sh) and the
 guests who scan a QR and play. The evening is the unit of ambition —
 MVP forever.
 

@@ -1,7 +1,5 @@
 {
   "ui": {
-    "title": "Salt Lake Map Night August 2026",
-    "subtitle": "Giving this thing a try",
     "lead": "Show me",
     "add": "+ add",
     "try": "try:",
@@ -51,6 +49,7 @@
     "identity_color": "color",
     "identity_me": "me",
     "scribble_anon": "someone",
+    "scribble_now": "just now",
     "cancel": "cancel",
     "save": "save",
     "pad_link": "party pad",

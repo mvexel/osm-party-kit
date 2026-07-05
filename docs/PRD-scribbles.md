@@ -93,7 +93,7 @@ live fix counter, and free-text map labels.
 ### Data source (subtraction)
 
 - SliceOSM support is removed. The build fetches a single **Geofabrik
-  extract** named by `extract_url` in `region.json`. A savvy mapper who wants
+  extract** named by `extract_url` in `party.json`. A savvy mapper who wants
   a smaller/custom PBF can swap the URL; that is sufficient flexibility for an
   MVP. This removes an always-on external dependency from the build path.
 

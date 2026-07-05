@@ -10,11 +10,11 @@ and open a printable party report at the end.
 
 ## Make your own
 
-1. Edit `region.json`. This is where you select the Geofabrik `extract_url`,
+1. Edit `party.json`. This is where you select the Geofabrik `extract_url`,
    boundary `admin_level` for picking places, language, and map center.
    Advanced users can point `extract_url` at any compatible `.osm.pbf`.
 2. Optional:
- - Set the language to one of the supported languages in `region.json`. Look for supported languages in `web/lang/`. You can copy an existing file and create your own, too.
+ - Set the language to one of the supported languages in `party.json`. Look for supported languages in `web/lang/`. You can copy an existing file and create your own, too.
  - Edit `nouns.yaml` to tune the themes or add new ones.
 3. Build your Kit with `./build.sh` (needs cosmo or `COSMO_BIN`, duckdb, curl, python3)
 
@@ -42,7 +42,7 @@ No local deps needed — the image carries cosmo, duckdb, curl, and python:
 docker compose up      # first start bakes the Kit, then serves it
 ```
 
-Edit `region.json`, `up`. The repo directory is bind-mounted, so the
+Edit `party.json`, `up`. The repo directory is bind-mounted, so the
 extract cache (`data/`), baked assets (`baked/`), and party scribbles
 (`party/`) all persist across `down`/`up`. Rebake by deleting `baked/`
 and restarting.
@@ -50,7 +50,7 @@ and restarting.
 ## Pipeline
 
 ```
-region.json ─┐
+party.json ─┐
 nouns.yaml ──┴─ build.sh
                 ├─ Geofabrik extract             → data/*.osm.pbf   (cached; delete to re-fetch)
                 ├─ cosmo convert (filters.yaml)  → out/*.parquet   (~2 min for Utah)
