@@ -1,849 +1,1599 @@
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>osmlogo — ask the map</title>
-<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-<style>
-  * { box-sizing: border-box; }
-  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-         display: flex; flex-direction: column; height: 100vh; }
-  header { padding: 10px 16px; background: #1a1a2e; color: #eee; display: flex;
-           align-items: center; gap: 12px; flex-wrap: wrap; }
-  header h1 { font-size: 16px; margin: 0; font-weight: 700; letter-spacing: 1px; }
-  header .status { font-size: 12px; opacity: .7; margin-left: auto; }
-  #sentence { padding: 14px 16px; background: #f4f4f8; display: flex; align-items: center;
-              gap: 8px; flex-wrap: wrap; border-bottom: 1px solid #ddd; font-size: 17px; }
-  .lead { color: #555; font-weight: 600; }
-  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px;
-          border-radius: 18px; font-weight: 700; font-size: 15px; cursor: pointer;
-          border: 2px solid transparent; user-select: none; position: relative; }
-  .chip:hover { filter: brightness(.95); }
-  .chip .x { opacity: .45; font-weight: 400; margin-left: 2px; }
-  .chip .x:hover { opacity: 1; }
-  .chip.noun  { background: #d3f2d3; color: #1b5e20; }
-  .chip.attr  { background: #ffe9c2; color: #8a5a00; }
-  .chip.spatial { background: #d6e8ff; color: #0d47a1; }
-  .chip.time  { background: #ffdcd2; color: #b23c17; }
-  .chip.place { background: #ead6ff; color: #5e1fa8; }
-  .chip.add { background: #fff; color: #888; border: 2px dashed #bbb; font-weight: 600; }
-  .chip.add:hover { color: #333; border-color: #888; }
-  #count-line { padding: 10px 16px; background: #fff; border-bottom: 1px solid #eee;
-                display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
-  #count { font-size: 28px; font-weight: 800; color: #1a1a2e; }
-  #count-context { color: #777; font-size: 14px; }
-  #banner { display: none; padding: 8px 16px; background: #fff3cd; color: #664d03;
-            font-size: 14px; border-bottom: 1px solid #ffe69c; }
-  #examples { padding: 8px 16px; background: #fafafa; border-bottom: 1px solid #eee;
-              font-size: 13px; color: #666; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-  #examples button { border: 1px solid #ccc; background: #fff; border-radius: 14px;
-                     padding: 4px 12px; cursor: pointer; font-size: 13px; }
-  #examples button:hover { background: #eef; }
-  #map { flex: 1; min-height: 0; }
-  #menu { position: absolute; z-index: 2000; background: #fff; border: 1px solid #ccc;
-          border-radius: 10px; box-shadow: 0 6px 24px rgba(0,0,0,.18); padding: 6px;
-          max-height: 340px; overflow-y: auto; min-width: 280px; display: none; }
-  #menu .section { font-size: 11px; text-transform: uppercase; letter-spacing: 1px;
-                   color: #999; padding: 8px 10px 3px; }
-  #menu .item { padding: 7px 10px; border-radius: 6px; cursor: pointer; font-size: 14px;
-                display: flex; justify-content: space-between; gap: 14px; }
-  #menu .item:hover { background: #f0f4ff; }
-  #menu .item .n { color: #999; font-variant-numeric: tabular-nums; }
-  #menu .place-search { width: calc(100% - 12px); margin: 4px 6px; padding: 6px 8px;
-                        border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
-  .maplibregl-popup-content { font-size: 13px; }
-  .maplibregl-popup-content a { color: #0d47a1; }
-  #loading-overlay { position: absolute; inset: 0; z-index: 1500; background: rgba(255,255,255,.75);
-      display: flex; align-items: center; justify-content: center; font-size: 15px; color: #444; }
-  .hdr-btn { border: 1px solid #555; background: transparent; color: #eee; border-radius: 14px;
-             padding: 4px 12px; cursor: pointer; font-size: 13px; }
-  .hdr-btn:hover { background: #333; }
-  .maplibregl-ctrl-group button { width: 44px; height: 44px; }
-  .maplibregl-ctrl button.ctrl-emoji { font-size: 22px; }
-  .maplibregl-ctrl button.ctrl-emoji.active { background: #ffe0ec; box-shadow: inset 0 0 0 2px #e91e63; }
-  .maplibregl-ctrl button.ctrl-emoji.off { opacity: .35; }
-  #draw-frame { display: none; position: absolute; inset: 0; z-index: 1600; pointer-events: none;
-                box-shadow: inset 0 0 0 8px #ffd400; }
-  #identity-btn { display: none; align-items: center; gap: 6px; }
-  .swatch-dot { display: inline-block; width: 12px; height: 12px; border-radius: 999px;
-                border: 1px solid rgba(255,255,255,.75); vertical-align: -1px; }
-  #draw-toolbar { display: none; position: absolute; z-index: 1700; right: 10px; top: 208px;
-                  flex-direction: column; background: #fff; border: 1px solid #ddd;
-                  border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,.2); overflow: hidden; }
-  #draw-toolbar button { width: 44px; height: 44px; padding: 0; border: none; background: #fff;
-                         color: #222; cursor: pointer; font-size: 20px; line-height: 1;
-                         border-bottom: 1px solid #eee; }
-  #draw-toolbar button:first-child { border-top-left-radius: 9px; border-top-right-radius: 9px; }
-  #draw-toolbar button:last-child { border-bottom: none;
-                                    border-bottom-left-radius: 9px; border-bottom-right-radius: 9px; }
-  #draw-toolbar button:hover { background: #f4f4f4; }
-  #draw-toolbar button.active { background: #ffe0ec; box-shadow: inset 0 0 0 2px #e91e63; }
-  #share-panel { display: none; position: absolute; z-index: 2500; top: 52px; right: 12px;
-                 background: #fff; border: 1px solid #ccc; border-radius: 12px; padding: 16px;
-                 box-shadow: 0 6px 24px rgba(0,0,0,.18); text-align: center; max-width: 320px; }
-  #share-panel svg { width: 220px; height: 220px; }
-  #share-panel .hint { font-size: 12px; color: #777; margin-top: 6px; }
-  #share-panel button { margin-top: 8px; border: 1px solid #ccc; background: #fff;
-                        border-radius: 14px; padding: 5px 14px; cursor: pointer; font-size: 13px; }
-  #share-url { margin-top: 8px; width: 100%; font-size: 11px; color: #555; border: 1px solid #ddd;
-               border-radius: 6px; padding: 5px 7px; background: #fafafa; }
-  #share-join { font-family: ui-monospace, monospace; font-size: 24px; font-weight: 800;
-                color: #1a1a2e; margin: 2px 0 10px; word-break: break-all; }
-  #identity-modal { display: none; position: fixed; inset: 0; z-index: 3000;
-                    background: rgba(15,15,25,.55); align-items: center; justify-content: center;
-                    padding: 16px; }
-  #identity-box { width: min(360px, 100%); background: #fff; border-radius: 8px;
-                  box-shadow: 0 16px 48px rgba(0,0,0,.3); padding: 18px; color: #222; }
-  #identity-box h2 { font-size: 18px; margin: 0 0 12px; }
-  #identity-box label { display: block; font-size: 13px; font-weight: 700; margin: 12px 0 6px; color: #444; }
-  #identity-box input { width: 100%; border: 1px solid #bbb; border-radius: 6px;
-                        padding: 9px 10px; font-size: 15px; }
-  #identity-swatches { display: grid; grid-template-columns: repeat(8, 1fr); gap: 8px; }
-  #identity-swatches button { aspect-ratio: 1; border-radius: 999px; border: 3px solid transparent;
-                              cursor: pointer; }
-  #identity-swatches button.active { border-color: #1a1a2e; box-shadow: 0 0 0 2px #fff inset; }
-  #identity-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
-  #identity-actions button { border: 1px solid #bbb; background: #fff; border-radius: 14px;
-                             padding: 6px 14px; cursor: pointer; }
-  #identity-save { background: #1a1a2e !important; color: #fff; border-color: #1a1a2e !important; }
-</style>
-</head>
-<body>
-<header>
-  <h1 id="app-title">🐢 OSMLOGO</h1>
-  <span id="app-subtitle" style="font-size:13px;opacity:.8"></span>
-  <span class="status" id="status"></span>
-  <button id="identity-btn" class="hdr-btn"></button>
-  <button id="share-btn" class="hdr-btn"></button>
-</header>
-<div id="share-panel">
-  <div class="hint" id="share-join-label"></div>
-  <div id="share-join"></div>
-  <div id="share-qr"></div>
-  <div class="hint" id="share-hint"></div>
-  <input id="share-url" readonly>
-  <button id="share-copy"></button>
-  <div id="share-links" style="margin-top:10px;font-size:13px"></div>
-</div>
-<div id="identity-modal">
-  <div id="identity-box">
-    <h2 id="identity-title"></h2>
-    <label id="identity-handle-label" for="identity-handle"></label>
-    <input id="identity-handle" maxlength="24" autocomplete="nickname">
-    <label id="identity-color-label"></label>
-    <div id="identity-swatches"></div>
-    <div id="identity-actions">
-      <button id="identity-cancel"></button>
-      <button id="identity-save"></button>
-    </div>
-  </div>
-</div>
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>osmlogo — ask the map</title>
+        <link
+            rel="stylesheet"
+            href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css"
+        />
+        <style>
+            * {
+                box-sizing: border-box;
+            }
+            body {
+                margin: 0;
+                font-family:
+                    -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                display: flex;
+                flex-direction: column;
+                height: 100vh;
+            }
+            header {
+                padding: 10px 16px;
+                background: #1a1a2e;
+                color: #eee;
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                flex-wrap: wrap;
+            }
+            header h1 {
+                font-size: 16px;
+                margin: 0;
+                font-weight: 700;
+                letter-spacing: 1px;
+            }
+            header .status {
+                font-size: 12px;
+                opacity: 0.7;
+                margin-left: auto;
+            }
+            #sentence {
+                padding: 14px 16px;
+                background: #f4f4f8;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                flex-wrap: wrap;
+                border-bottom: 1px solid #ddd;
+                font-size: 17px;
+            }
+            .lead {
+                color: #555;
+                font-weight: 600;
+            }
+            .chip {
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                padding: 7px 12px;
+                border-radius: 18px;
+                font-weight: 700;
+                font-size: 15px;
+                cursor: pointer;
+                border: 2px solid transparent;
+                user-select: none;
+                position: relative;
+            }
+            .chip:hover {
+                filter: brightness(0.95);
+            }
+            .chip .x {
+                opacity: 0.45;
+                font-weight: 400;
+                margin-left: 2px;
+            }
+            .chip .x:hover {
+                opacity: 1;
+            }
+            .chip.noun {
+                background: #d3f2d3;
+                color: #1b5e20;
+            }
+            .chip.attr {
+                background: #ffe9c2;
+                color: #8a5a00;
+            }
+            .chip.spatial {
+                background: #d6e8ff;
+                color: #0d47a1;
+            }
+            .chip.time {
+                background: #ffdcd2;
+                color: #b23c17;
+            }
+            .chip.place {
+                background: #ead6ff;
+                color: #5e1fa8;
+            }
+            .chip.add {
+                background: #fff;
+                color: #888;
+                border: 2px dashed #bbb;
+                font-weight: 600;
+            }
+            .chip.add:hover {
+                color: #333;
+                border-color: #888;
+            }
+            #count-line {
+                padding: 10px 16px;
+                background: #fff;
+                border-bottom: 1px solid #eee;
+                display: flex;
+                align-items: baseline;
+                gap: 10px;
+                flex-wrap: wrap;
+            }
+            #count {
+                font-size: 28px;
+                font-weight: 800;
+                color: #1a1a2e;
+            }
+            #count-context {
+                color: #777;
+                font-size: 14px;
+            }
+            #banner {
+                display: none;
+                padding: 8px 16px;
+                background: #fff3cd;
+                color: #664d03;
+                font-size: 14px;
+                border-bottom: 1px solid #ffe69c;
+            }
+            #examples {
+                padding: 8px 16px;
+                background: #fafafa;
+                border-bottom: 1px solid #eee;
+                font-size: 13px;
+                color: #666;
+                display: flex;
+                gap: 8px;
+                align-items: center;
+                flex-wrap: wrap;
+            }
+            #examples button {
+                border: 1px solid #ccc;
+                background: #fff;
+                border-radius: 14px;
+                padding: 4px 12px;
+                cursor: pointer;
+                font-size: 13px;
+            }
+            #examples button:hover {
+                background: #eef;
+            }
+            #map {
+                flex: 1;
+                min-height: 0;
+            }
+            #menu {
+                position: absolute;
+                z-index: 2000;
+                background: #fff;
+                border: 1px solid #ccc;
+                border-radius: 10px;
+                box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+                padding: 6px;
+                max-height: 340px;
+                overflow-y: auto;
+                min-width: 280px;
+                display: none;
+            }
+            #menu .section {
+                font-size: 11px;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+                color: #999;
+                padding: 8px 10px 3px;
+            }
+            #menu .item {
+                padding: 7px 10px;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 14px;
+                display: flex;
+                justify-content: space-between;
+                gap: 14px;
+            }
+            #menu .item:hover {
+                background: #f0f4ff;
+            }
+            #menu .item .n {
+                color: #999;
+                font-variant-numeric: tabular-nums;
+            }
+            #menu .place-search {
+                width: calc(100% - 12px);
+                margin: 4px 6px;
+                padding: 6px 8px;
+                border: 1px solid #ccc;
+                border-radius: 6px;
+                font-size: 14px;
+            }
+            .maplibregl-popup-content {
+                font-size: 13px;
+            }
+            .maplibregl-popup-content a {
+                color: #0d47a1;
+            }
+            #loading-overlay {
+                position: absolute;
+                inset: 0;
+                z-index: 1500;
+                background: rgba(255, 255, 255, 0.75);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 15px;
+                color: #444;
+            }
+            .hdr-btn {
+                border: 1px solid #555;
+                background: transparent;
+                color: #eee;
+                border-radius: 14px;
+                padding: 4px 12px;
+                cursor: pointer;
+                font-size: 13px;
+            }
+            .hdr-btn:hover {
+                background: #333;
+            }
+            .maplibregl-ctrl-group button {
+                width: 44px;
+                height: 44px;
+            }
+            .maplibregl-ctrl button.ctrl-emoji {
+                font-size: 22px;
+            }
+            .maplibregl-ctrl button.ctrl-emoji.active {
+                background: #ffe0ec;
+                box-shadow: inset 0 0 0 2px #e91e63;
+            }
+            .maplibregl-ctrl button.ctrl-emoji.off {
+                opacity: 0.35;
+            }
+            #draw-frame {
+                display: none;
+                position: absolute;
+                inset: 0;
+                z-index: 1600;
+                pointer-events: none;
+                box-shadow: inset 0 0 0 8px #ffd400;
+            }
+            #identity-btn {
+                display: none;
+                align-items: center;
+                gap: 6px;
+            }
+            .swatch-dot {
+                display: inline-block;
+                width: 12px;
+                height: 12px;
+                border-radius: 999px;
+                border: 1px solid rgba(255, 255, 255, 0.75);
+                vertical-align: -1px;
+            }
+            #draw-toolbar {
+                display: none;
+                position: absolute;
+                z-index: 1700;
+                right: 10px;
+                top: 208px;
+                flex-direction: column;
+                background: #fff;
+                border: 1px solid #ddd;
+                border-radius: 10px;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+                overflow: hidden;
+            }
+            #draw-toolbar button {
+                width: 44px;
+                height: 44px;
+                padding: 0;
+                border: none;
+                background: #fff;
+                color: #222;
+                cursor: pointer;
+                font-size: 20px;
+                line-height: 1;
+                border-bottom: 1px solid #eee;
+            }
+            #draw-toolbar button:first-child {
+                border-top-left-radius: 9px;
+                border-top-right-radius: 9px;
+            }
+            #draw-toolbar button:last-child {
+                border-bottom: none;
+                border-bottom-left-radius: 9px;
+                border-bottom-right-radius: 9px;
+            }
+            #draw-toolbar button:hover {
+                background: #f4f4f4;
+            }
+            #draw-toolbar button.active {
+                background: #ffe0ec;
+                box-shadow: inset 0 0 0 2px #e91e63;
+            }
+            #share-panel {
+                display: none;
+                position: absolute;
+                z-index: 2500;
+                top: 52px;
+                right: 12px;
+                background: #fff;
+                border: 1px solid #ccc;
+                border-radius: 12px;
+                padding: 16px;
+                box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+                text-align: center;
+                max-width: 320px;
+            }
+            #share-panel svg {
+                width: 220px;
+                height: 220px;
+            }
+            #share-panel .hint {
+                font-size: 12px;
+                color: #777;
+                margin-top: 6px;
+            }
+            #share-panel button {
+                margin-top: 8px;
+                border: 1px solid #ccc;
+                background: #fff;
+                border-radius: 14px;
+                padding: 5px 14px;
+                cursor: pointer;
+                font-size: 13px;
+            }
+            #share-url {
+                margin-top: 8px;
+                width: 100%;
+                font-size: 11px;
+                color: #555;
+                border: 1px solid #ddd;
+                border-radius: 6px;
+                padding: 5px 7px;
+                background: #fafafa;
+            }
+            #share-join {
+                font-family: ui-monospace, monospace;
+                font-size: 24px;
+                font-weight: 800;
+                color: #1a1a2e;
+                margin: 2px 0 10px;
+                word-break: break-all;
+            }
+            #identity-modal {
+                display: none;
+                position: fixed;
+                inset: 0;
+                z-index: 3000;
+                background: rgba(15, 15, 25, 0.55);
+                align-items: center;
+                justify-content: center;
+                padding: 16px;
+            }
+            #identity-box {
+                width: min(360px, 100%);
+                background: #fff;
+                border-radius: 8px;
+                box-shadow: 0 16px 48px rgba(0, 0, 0, 0.3);
+                padding: 18px;
+                color: #222;
+            }
+            #identity-box h2 {
+                font-size: 18px;
+                margin: 0 0 12px;
+            }
+            #identity-box label {
+                display: block;
+                font-size: 13px;
+                font-weight: 700;
+                margin: 12px 0 6px;
+                color: #444;
+            }
+            #identity-box input {
+                width: 100%;
+                border: 1px solid #bbb;
+                border-radius: 6px;
+                padding: 9px 10px;
+                font-size: 15px;
+            }
+            #identity-swatches {
+                display: grid;
+                grid-template-columns: repeat(8, 1fr);
+                gap: 8px;
+            }
+            #identity-swatches button {
+                aspect-ratio: 1;
+                border-radius: 999px;
+                border: 3px solid transparent;
+                cursor: pointer;
+            }
+            #identity-swatches button.active {
+                border-color: #1a1a2e;
+                box-shadow: 0 0 0 2px #fff inset;
+            }
+            #identity-actions {
+                display: flex;
+                justify-content: flex-end;
+                gap: 8px;
+                margin-top: 16px;
+            }
+            #identity-actions button {
+                border: 1px solid #bbb;
+                background: #fff;
+                border-radius: 14px;
+                padding: 6px 14px;
+                cursor: pointer;
+            }
+            #identity-save {
+                background: #1a1a2e !important;
+                color: #fff;
+                border-color: #1a1a2e !important;
+            }
+        </style>
+    </head>
+    <body>
+        <header>
+            <h1 id="app-title">🐢 OSMLOGO</h1>
+            <span
+                id="app-subtitle"
+                style="font-size: 13px; opacity: 0.8"
+            ></span>
+            <span class="status" id="status"></span>
+            <button id="identity-btn" class="hdr-btn"></button>
+            <button id="share-btn" class="hdr-btn"></button>
+        </header>
+        <div id="share-panel">
+            <div class="hint" id="share-join-label"></div>
+            <div id="share-join"></div>
+            <div id="share-qr"></div>
+            <div class="hint" id="share-hint"></div>
+            <input id="share-url" readonly />
+            <button id="share-copy"></button>
+            <div
+                id="share-links"
+                style="margin-top: 10px; font-size: 13px"
+            ></div>
+        </div>
+        <div id="identity-modal">
+            <div id="identity-box">
+                <h2 id="identity-title"></h2>
+                <label id="identity-handle-label" for="identity-handle"></label>
+                <input
+                    id="identity-handle"
+                    maxlength="24"
+                    autocomplete="nickname"
+                />
+                <label id="identity-color-label"></label>
+                <div id="identity-swatches"></div>
+                <div id="identity-actions">
+                    <button id="identity-cancel"></button>
+                    <button id="identity-save"></button>
+                </div>
+            </div>
+        </div>
 
-<div id="sentence"></div>
-<div id="count-line">
-  <span id="count">—</span>
-  <span id="count-context"></span>
-</div>
-<div id="banner"></div>
-<div id="examples"><span id="try-label"></span></div>
-<div style="position:relative;flex:1;display:flex;min-height:0">
-  <div id="map"></div>
-  <div id="draw-frame"></div>
-  <div id="loading-overlay"></div>
-  <div id="draw-toolbar">
-    <button id="pen-tool"></button>
-    <button id="text-tool">T</button>
-    <button class="stamp" data-stamp="📍">📍</button>
-    <button class="stamp" data-stamp="✅">✅</button>
-    <button class="stamp" data-stamp="❓">❓</button>
-    <button class="stamp" data-stamp="⚠️">⚠️</button>
-    <button id="undo-btn" class="stamp" style="display:none">↶</button>
-  </div>
-</div>
-<div id="menu"></div>
+        <div id="sentence"></div>
+        <div id="count-line">
+            <span id="count">—</span>
+            <span id="count-context"></span>
+        </div>
+        <div id="banner"></div>
+        <div id="examples"><span id="try-label"></span></div>
+        <div style="position: relative; flex: 1; display: flex; min-height: 0">
+            <div id="map"></div>
+            <div id="draw-frame"></div>
+            <div id="loading-overlay"></div>
+            <div id="draw-toolbar">
+                <button id="pen-tool"></button>
+                <button id="text-tool">T</button>
+                <button class="stamp" data-stamp="📍">📍</button>
+                <button class="stamp" data-stamp="✅">✅</button>
+                <button class="stamp" data-stamp="❓">❓</button>
+                <button class="stamp" data-stamp="⚠️">⚠️</button>
+                <button id="undo-btn" class="stamp" style="display: none">
+                    ↶
+                </button>
+            </div>
+        </div>
+        <div id="menu"></div>
 
-<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
-<script type="module">
-import { STAMP_GLYPHS, textImageKey, parseScribbles, toFeatures } from './scribbles.js';
+        <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+        <script type="module">
+            import {
+                STAMP_GLYPHS,
+                textImageKey,
+                parseScribbles,
+                toFeatures,
+            } from "./scribbles.js";
 
-// ---------------------------------------------------------------- config (region + language dialect)
-const REGION = await (await fetch('../region.json')).json();
-const LANG = await (await fetch(`lang/${REGION.language}.json`)).json();
-const { ui: UI, nouns: NOUNS, time: TIME_OPTS, examples: EXAMPLES } = LANG;
-const MAX_DOTS = 2000;
+            // ---------------------------------------------------------------- config (region + language dialect)
+            const REGION = await (await fetch("../region.json")).json();
+            const LANG = await (
+                await fetch(`lang/${REGION.language}.json`)
+            ).json();
+            const {
+                ui: UI,
+                nouns: NOUNS,
+                time: TIME_OPTS,
+                examples: EXAMPLES,
+            } = LANG;
+            const MAX_DOTS = 2000;
 
-document.getElementById('app-title').textContent = `🐢 ${UI.title}`;
-document.getElementById('app-subtitle').textContent = `${UI.subtitle} — ${REGION.name}`;
-document.getElementById('try-label').textContent = UI.try;
-document.getElementById('loading-overlay').textContent = UI.loading;
-document.title = `${UI.title.toLowerCase()} — ${REGION.name}`;
+            document.getElementById("app-title").textContent = `🐢 ${UI.title}`;
+            document.getElementById("app-subtitle").textContent =
+                `${UI.subtitle} — ${REGION.name}`;
+            document.getElementById("try-label").textContent = UI.try;
+            document.getElementById("loading-overlay").textContent = UI.loading;
+            document.title = `${UI.title.toLowerCase()} — ${REGION.name}`;
 
-// ---------------------------------------------------------------- state
-let state = structuredClone(EXAMPLES[0].state);
-let conn = null, places = [];
+            // ---------------------------------------------------------------- state
+            let state = structuredClone(EXAMPLES[0].state);
+            let conn = null,
+                places = [];
 
-// ---------------------------------------------------------------- duckdb-wasm
-const status = (m) => document.getElementById('status').textContent = m;
-status(UI.warming);
-async function initDB() {
-  const duckdb = await import('https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.29.0/+esm');
-  const bundle = await duckdb.selectBundle(duckdb.getJsDelivrBundles());
-  const workerUrl = URL.createObjectURL(new Blob([`importScripts("${bundle.mainWorker}");`], { type: 'text/javascript' }));
-  const db = new duckdb.AsyncDuckDB(new duckdb.ConsoleLogger(duckdb.LogLevel.WARNING), new Worker(workerUrl));
-  status(UI.downloading);
-  await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
-  conn = await db.connect();
-  status(UI.ready);
-}
-const tableUrl = (n) => `'${location.origin}${location.pathname.replace(/[^/]*$/, '')}../baked/${n}.parquet'`;
-async function q(sql) {
-  const res = await conn.query(sql);
-  return res.toArray().map((r) => r.toJSON());
-}
+            // ---------------------------------------------------------------- duckdb-wasm
+            const status = (m) =>
+                (document.getElementById("status").textContent = m);
+            status(UI.warming);
+            async function initDB() {
+                const duckdb =
+                    await import("https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.29.0/+esm");
+                const bundle = await duckdb.selectBundle(
+                    duckdb.getJsDelivrBundles(),
+                );
+                const workerUrl = URL.createObjectURL(
+                    new Blob([`importScripts("${bundle.mainWorker}");`], {
+                        type: "text/javascript",
+                    }),
+                );
+                const db = new duckdb.AsyncDuckDB(
+                    new duckdb.ConsoleLogger(duckdb.LogLevel.WARNING),
+                    new Worker(workerUrl),
+                );
+                status(UI.downloading);
+                await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
+                conn = await db.connect();
+                status(UI.ready);
+            }
+            const tableUrl = (n) =>
+                `'${location.origin}${location.pathname.replace(/[^/]*$/, "")}../baked/${n}.parquet'`;
+            async function q(sql) {
+                const res = await conn.query(sql);
+                return res.toArray().map((r) => r.toJSON());
+            }
 
-// ---------------------------------------------------------------- SQL building
-const esc = (s) => s.replace(/'/g, "''");
-function cutoff(opt) {
-  const d = new Date();
-  if (opt.kind === 'older') d.setFullYear(d.getFullYear() - opt.years);
-  else d.setMonth(d.getMonth() - opt.months);
-  return d.toISOString().slice(0, 10);
-}
-function whereClauses(st, includePlace = true) {
-  const w = [];
-  for (const p of st.preds) {
-    if (p.t === 'without') w.push(`${p.k} IS NULL`);
-    if (p.t === 'with') w.push(`${p.k} IS NOT NULL`);
-    if (p.t === 'nocontain') w.push(`${p.k} = 0`);
-    if (p.t === 'contain') w.push(`${p.k} > 0`);
-    if (p.t === 'time') {
-      const opt = TIME_OPTS.find((o) => o.key === p.k);
-      w.push(opt.kind === 'older' ? `timestamp < '${cutoff(opt)}'` : `timestamp >= '${cutoff(opt)}'`);
-    }
-  }
-  if (includePlace && st.place) w.push(`place = '${esc(st.place)}'`);
-  return w.length ? 'WHERE ' + w.join(' AND ') : '';
-}
+            // ---------------------------------------------------------------- SQL building
+            const esc = (s) => s.replace(/'/g, "''");
+            function cutoff(opt) {
+                const d = new Date();
+                if (opt.kind === "older")
+                    d.setFullYear(d.getFullYear() - opt.years);
+                else d.setMonth(d.getMonth() - opt.months);
+                return d.toISOString().slice(0, 10);
+            }
+            function whereClauses(st, includePlace = true) {
+                const w = [];
+                for (const p of st.preds) {
+                    if (p.t === "without") w.push(`${p.k} IS NULL`);
+                    if (p.t === "with") w.push(`${p.k} IS NOT NULL`);
+                    if (p.t === "nocontain") w.push(`${p.k} = 0`);
+                    if (p.t === "contain") w.push(`${p.k} > 0`);
+                    if (p.t === "time") {
+                        const opt = TIME_OPTS.find((o) => o.key === p.k);
+                        w.push(
+                            opt.kind === "older"
+                                ? `timestamp < '${cutoff(opt)}'`
+                                : `timestamp >= '${cutoff(opt)}'`,
+                        );
+                    }
+                }
+                if (includePlace && st.place)
+                    w.push(`place = '${esc(st.place)}'`);
+                return w.length ? "WHERE " + w.join(" AND ") : "";
+            }
 
-// ---------------------------------------------------------------- run query
-let runToken = 0;
-let myHash = '';
-async function run() {
-  renderSentence();
-  myHash = encodeURIComponent(JSON.stringify(state));
-  location.hash = myHash;
-  renderShareQR();
-  if (!conn) return;
-  const my = ++runToken;
-  const t = tableUrl(state.noun);
-  document.getElementById('count').textContent = '…';
-  try {
-    const [row] = await q(`SELECT count(*) AS c FROM ${t} ${whereClauses(state)}`);
-    if (my !== runToken) return;
-    const n = Number(row.c);
-    const [tot] = await q(`SELECT count(*) AS c FROM ${t} ${state.place ? `WHERE place='${esc(state.place)}'` : ''}`);
-    if (my !== runToken) return;
-    const total = Number(tot.c);
-    document.getElementById('count').textContent = n.toLocaleString();
-    document.getElementById('count-context').textContent =
-      `${UI.of} ${total.toLocaleString()} ${NOUNS[state.noun].label} ${state.place ? UI.in + ' ' + state.place : UI.statewide}`;
-    const banner = document.getElementById('banner');
-    if (state.preds.some((p) => p.t === 'without') && total > 50 && n / total > 0.95) {
-      banner.style.display = 'block';
-      banner.textContent = `⚠️ ${(100 * n / total).toFixed(0)}% ${UI.campaign}`;
-    } else banner.style.display = 'none';
-    await mapReady;
-    await drawDots(t, my, n);
-  } catch (e) {
-    if (my === runToken) { document.getElementById('count').textContent = '⚠'; console.error(e); }
-  }
-}
-async function drawDots(t, my, n) {
-  const hasName = 'name' in (NOUNS[state.noun].attrs || {});
-  const cols = `lon, lat, osm_id, osm_type, ${hasName ? 'name' : 'NULL AS name'}, timestamp`;
-  const rows = await q(`SELECT ${cols} FROM ${t} ${whereClauses(state)} LIMIT ${MAX_DOTS}`);
-  if (my !== runToken) return;
-  const feats = rows.filter((r) => r.lon != null).map((r) => ({
-    type: 'Feature',
-    geometry: { type: 'Point', coordinates: [r.lon, r.lat] },
-    properties: { name: r.name ?? UI.unnamed, osm_id: String(r.osm_id), osm_type: r.osm_type,
-                  ts: String(r.timestamp).slice(0, 10) },
-  }));
-  map.getSource('dots').setData({ type: 'FeatureCollection', features: feats });
-  if (feats.length) {
-    const b = new maplibregl.LngLatBounds();
-    feats.forEach((f) => b.extend(f.geometry.coordinates));
-    map.fitBounds(b, { padding: 40, maxZoom: 14 });
-  }
-  document.getElementById('count-context').textContent +=
-    n > MAX_DOTS ? ` — ${UI.showing_first} ${MAX_DOTS.toLocaleString()}, ${UI.narrow}` : '';
-}
+            // ---------------------------------------------------------------- run query
+            let runToken = 0;
+            let myHash = "";
+            async function run() {
+                renderSentence();
+                myHash = encodeURIComponent(JSON.stringify(state));
+                location.hash = myHash;
+                renderShareQR();
+                if (!conn) return;
+                const my = ++runToken;
+                const t = tableUrl(state.noun);
+                document.getElementById("count").textContent = "…";
+                try {
+                    const [row] = await q(
+                        `SELECT count(*) AS c FROM ${t} ${whereClauses(state)}`,
+                    );
+                    if (my !== runToken) return;
+                    const n = Number(row.c);
+                    const [tot] = await q(
+                        `SELECT count(*) AS c FROM ${t} ${state.place ? `WHERE place='${esc(state.place)}'` : ""}`,
+                    );
+                    if (my !== runToken) return;
+                    const total = Number(tot.c);
+                    document.getElementById("count").textContent =
+                        n.toLocaleString();
+                    document.getElementById("count-context").textContent =
+                        `${UI.of} ${total.toLocaleString()} ${NOUNS[state.noun].label} ${state.place ? UI.in + " " + state.place : UI.statewide}`;
+                    const banner = document.getElementById("banner");
+                    if (
+                        state.preds.some((p) => p.t === "without") &&
+                        total > 50 &&
+                        n / total > 0.95
+                    ) {
+                        banner.style.display = "block";
+                        banner.textContent = `⚠️ ${((100 * n) / total).toFixed(0)}% ${UI.campaign}`;
+                    } else banner.style.display = "none";
+                    await mapReady;
+                    await drawDots(t, my, n);
+                } catch (e) {
+                    if (my === runToken) {
+                        document.getElementById("count").textContent = "⚠";
+                        console.error(e);
+                    }
+                }
+            }
+            async function drawDots(t, my, n) {
+                const hasName = "name" in (NOUNS[state.noun].attrs || {});
+                const cols = `lon, lat, osm_id, osm_type, ${hasName ? "name" : "NULL AS name"}, timestamp`;
+                const rows = await q(
+                    `SELECT ${cols} FROM ${t} ${whereClauses(state)} LIMIT ${MAX_DOTS}`,
+                );
+                if (my !== runToken) return;
+                const feats = rows
+                    .filter((r) => r.lon != null)
+                    .map((r) => ({
+                        type: "Feature",
+                        geometry: {
+                            type: "Point",
+                            coordinates: [r.lon, r.lat],
+                        },
+                        properties: {
+                            name: r.name ?? UI.unnamed,
+                            osm_id: String(r.osm_id),
+                            osm_type: r.osm_type,
+                            ts: String(r.timestamp).slice(0, 10),
+                        },
+                    }));
+                map.getSource("dots").setData({
+                    type: "FeatureCollection",
+                    features: feats,
+                });
+                if (feats.length) {
+                    const b = new maplibregl.LngLatBounds();
+                    feats.forEach((f) => b.extend(f.geometry.coordinates));
+                    map.fitBounds(b, { padding: 40, maxZoom: 14 });
+                }
+                document.getElementById("count-context").textContent +=
+                    n > MAX_DOTS
+                        ? ` — ${UI.showing_first} ${MAX_DOTS.toLocaleString()}, ${UI.narrow}`
+                        : "";
+            }
 
-// ---------------------------------------------------------------- sentence UI
-const S = document.getElementById('sentence');
-function chip(cls, html, onRemove, onClick) {
-  const el = document.createElement('span');
-  el.className = 'chip ' + cls;
-  el.innerHTML = html;
-  if (onRemove) {
-    const x = document.createElement('span'); x.className = 'x'; x.textContent = '✕';
-    x.onclick = (e) => { e.stopPropagation(); onRemove(); };
-    el.appendChild(x);
-  }
-  if (onClick) el.onclick = onClick;
-  return el;
-}
-function predLabel(p) {
-  const nn = NOUNS[state.noun];
-  if (p.t === 'without') return `${UI.without} ${nn.attrs[p.k]}`;
-  if (p.t === 'with') return `${UI.with} ${nn.attrs[p.k]}`;
-  if (p.t === 'nocontain') return `${UI.with_no} ${nn.contains[p.k]}`;
-  if (p.t === 'contain') return `${UI.having} ${nn.contains[p.k]}`;
-  if (p.t === 'time') return TIME_OPTS.find((o) => o.key === p.k).label;
-}
-function renderSentence() {
-  S.innerHTML = `<span class="lead">${UI.lead}</span>`;
-  S.appendChild(chip('noun', `${NOUNS[state.noun].emoji} ${NOUNS[state.noun].label}`, null,
-    (e) => openMenu(e.currentTarget, nounMenu())));
-  state.preds.forEach((p, i) => {
-    const cls = p.t === 'time' ? 'time' : (p.t === 'nocontain' || p.t === 'contain') ? 'spatial' : 'attr';
-    S.appendChild(chip(cls, predLabel(p), () => { state.preds.splice(i, 1); run(); }));
-  });
-  if (state.place) S.appendChild(chip('place', `${UI.in} ${state.place}`, () => { state.place = null; run(); }));
-  S.appendChild(chip('add', UI.add, null, (e) => openMenu(e.currentTarget, addMenu())));
-}
+            // ---------------------------------------------------------------- sentence UI
+            const S = document.getElementById("sentence");
+            function chip(cls, html, onRemove, onClick) {
+                const el = document.createElement("span");
+                el.className = "chip " + cls;
+                el.innerHTML = html;
+                if (onRemove) {
+                    const x = document.createElement("span");
+                    x.className = "x";
+                    x.textContent = "✕";
+                    x.onclick = (e) => {
+                        e.stopPropagation();
+                        onRemove();
+                    };
+                    el.appendChild(x);
+                }
+                if (onClick) el.onclick = onClick;
+                return el;
+            }
+            function predLabel(p) {
+                const nn = NOUNS[state.noun];
+                if (p.t === "without") return `${UI.without} ${nn.attrs[p.k]}`;
+                if (p.t === "with") return `${UI.with} ${nn.attrs[p.k]}`;
+                if (p.t === "nocontain")
+                    return `${UI.with_no} ${nn.contains[p.k]}`;
+                if (p.t === "contain")
+                    return `${UI.having} ${nn.contains[p.k]}`;
+                if (p.t === "time")
+                    return TIME_OPTS.find((o) => o.key === p.k).label;
+            }
+            function renderSentence() {
+                S.innerHTML = `<span class="lead">${UI.lead}</span>`;
+                S.appendChild(
+                    chip(
+                        "noun",
+                        `${NOUNS[state.noun].emoji} ${NOUNS[state.noun].label}`,
+                        null,
+                        (e) => openMenu(e.currentTarget, nounMenu()),
+                    ),
+                );
+                state.preds.forEach((p, i) => {
+                    const cls =
+                        p.t === "time"
+                            ? "time"
+                            : p.t === "nocontain" || p.t === "contain"
+                              ? "spatial"
+                              : "attr";
+                    S.appendChild(
+                        chip(cls, predLabel(p), () => {
+                            state.preds.splice(i, 1);
+                            run();
+                        }),
+                    );
+                });
+                if (state.place)
+                    S.appendChild(
+                        chip("place", `${UI.in} ${state.place}`, () => {
+                            state.place = null;
+                            run();
+                        }),
+                    );
+                S.appendChild(
+                    chip("add", UI.add, null, (e) =>
+                        openMenu(e.currentTarget, addMenu()),
+                    ),
+                );
+            }
 
-// ---------------------------------------------------------------- menus
-const menuEl = document.getElementById('menu');
-function openMenu(anchor, items) {
-  menuEl.innerHTML = '';
-  for (const it of items) {
-    if (it.section) {
-      const s = document.createElement('div'); s.className = 'section'; s.textContent = it.section;
-      menuEl.appendChild(s); continue;
-    }
-    if (it.placePicker) { menuEl.appendChild(buildPlacePicker()); continue; }
-    const d = document.createElement('div'); d.className = 'item';
-    d.innerHTML = `<span>${it.label}</span><span class="n" data-count-key="${it.countKey ?? ''}"></span>`;
-    d.onclick = () => { closeMenu(); it.action(); };
-    menuEl.appendChild(d);
-  }
-  const r = anchor.getBoundingClientRect();
-  menuEl.style.left = Math.min(r.left, innerWidth - 320) + 'px';
-  menuEl.style.top = r.bottom + 6 + 'px';
-  menuEl.style.display = 'block';
-  fillMenuCounts(items);
-}
-function closeMenu() { menuEl.style.display = 'none'; }
-document.addEventListener('click', (e) => { if (!menuEl.contains(e.target) && !e.target.closest('.chip')) closeMenu(); });
+            // ---------------------------------------------------------------- menus
+            const menuEl = document.getElementById("menu");
+            function openMenu(anchor, items) {
+                menuEl.innerHTML = "";
+                for (const it of items) {
+                    if (it.section) {
+                        const s = document.createElement("div");
+                        s.className = "section";
+                        s.textContent = it.section;
+                        menuEl.appendChild(s);
+                        continue;
+                    }
+                    if (it.placePicker) {
+                        menuEl.appendChild(buildPlacePicker());
+                        continue;
+                    }
+                    const d = document.createElement("div");
+                    d.className = "item";
+                    d.innerHTML = `<span>${it.label}</span><span class="n" data-count-key="${it.countKey ?? ""}"></span>`;
+                    d.onclick = () => {
+                        closeMenu();
+                        it.action();
+                    };
+                    menuEl.appendChild(d);
+                }
+                const r = anchor.getBoundingClientRect();
+                menuEl.style.left = Math.min(r.left, innerWidth - 320) + "px";
+                menuEl.style.top = r.bottom + 6 + "px";
+                menuEl.style.display = "block";
+                fillMenuCounts(items);
+            }
+            function closeMenu() {
+                menuEl.style.display = "none";
+            }
+            document.addEventListener("click", (e) => {
+                if (!menuEl.contains(e.target) && !e.target.closest(".chip"))
+                    closeMenu();
+            });
 
-function nounMenu() {
-  return [{ section: UI.menu_show }, ...Object.entries(NOUNS).map(([k, v]) => ({
-    label: `${v.emoji} ${v.label}`,
-    action: () => { state.noun = k; state.preds = []; run(); },
-  }))];
-}
-function addMenu() {
-  const nn = NOUNS[state.noun];
-  const used = new Set(state.preds.map((p) => p.t + ':' + p.k));
-  const items = [];
-  const attrs = Object.entries(nn.attrs || {});
-  if (attrs.length) {
-    items.push({ section: UI.menu_missing });
-    for (const [k, l] of attrs) if (!used.has('without:' + k))
-      items.push({ label: `${UI.without} ${l}`, countKey: `without:${k}`,
-        action: () => { state.preds.push({ t: 'without', k }); run(); } });
-    items.push({ section: UI.menu_has });
-    for (const [k, l] of attrs) if (!used.has('with:' + k))
-      items.push({ label: `${UI.with} ${l}`, countKey: `with:${k}`,
-        action: () => { state.preds.push({ t: 'with', k }); run(); } });
-  }
-  const cont = Object.entries(nn.contains || {});
-  if (cont.length) {
-    items.push({ section: UI.menu_nearby });
-    for (const [k, l] of cont) {
-      if (!used.has('nocontain:' + k))
-        items.push({ label: `${UI.with_no} ${l}`, countKey: `nocontain:${k}`,
-          action: () => { state.preds.push({ t: 'nocontain', k }); run(); } });
-      if (!used.has('contain:' + k))
-        items.push({ label: `${UI.having} ${l}`, countKey: `contain:${k}`,
-          action: () => { state.preds.push({ t: 'contain', k }); run(); } });
-    }
-  }
-  if (!state.preds.some((p) => p.t === 'time')) {
-    items.push({ section: UI.menu_fresh });
-    for (const o of TIME_OPTS)
-      items.push({ label: o.label, countKey: `time:${o.key}`,
-        action: () => { state.preds.push({ t: 'time', k: o.key }); run(); } });
-  }
-  if (!state.place) {
-    items.push({ section: UI.menu_where });
-    items.push({ placePicker: true });
-  }
-  return items;
-}
-// typeahead over the (long) place list, sorted by how many results each place holds
-function buildPlacePicker() {
-  const wrap = document.createElement('div');
-  const inp = document.createElement('input');
-  inp.className = 'place-search';
-  inp.placeholder = UI.search_places ?? 'type to filter…';
-  const list = document.createElement('div');
-  wrap.append(inp, list);
-  let counts = null;
-  const render = () => {
-    const f = inp.value.trim().toLowerCase();
-    const matched = places.filter((p) => p.toLowerCase().includes(f));
-    if (counts) matched.sort((a, b) => (counts.get(b) ?? 0) - (counts.get(a) ?? 0) || a.localeCompare(b));
-    list.innerHTML = '';
-    for (const p of matched.slice(0, 12)) {
-      const d = document.createElement('div');
-      d.className = 'item';
-      d.innerHTML = `<span>${UI.in} ${p}</span><span class="n">${counts?.get(p)?.toLocaleString() ?? ''}</span>`;
-      d.onclick = () => { closeMenu(); state.place = p; run(); };
-      list.appendChild(d);
-    }
-    if (matched.length > 12) {
-      const more = document.createElement('div');
-      more.className = 'section';
-      more.textContent = `+ ${(matched.length - 12).toLocaleString()} — ${inp.placeholder}`;
-      list.appendChild(more);
-    }
-  };
-  inp.oninput = render;
-  inp.onkeydown = (e) => { if (e.key === 'Enter') list.querySelector('.item')?.click(); };
-  render();
-  (async () => {
-    if (!conn) return;
-    try {
-      const rows = await q(`SELECT place, count(*) AS c FROM ${tableUrl(state.noun)}
+            function nounMenu() {
+                return [
+                    { section: UI.menu_show },
+                    ...Object.entries(NOUNS).map(([k, v]) => ({
+                        label: `${v.emoji} ${v.label}`,
+                        action: () => {
+                            state.noun = k;
+                            state.preds = [];
+                            run();
+                        },
+                    })),
+                ];
+            }
+            function addMenu() {
+                const nn = NOUNS[state.noun];
+                const used = new Set(state.preds.map((p) => p.t + ":" + p.k));
+                const items = [];
+                const attrs = Object.entries(nn.attrs || {});
+                if (attrs.length) {
+                    items.push({ section: UI.menu_missing });
+                    for (const [k, l] of attrs)
+                        if (!used.has("without:" + k))
+                            items.push({
+                                label: `${UI.without} ${l}`,
+                                countKey: `without:${k}`,
+                                action: () => {
+                                    state.preds.push({ t: "without", k });
+                                    run();
+                                },
+                            });
+                    items.push({ section: UI.menu_has });
+                    for (const [k, l] of attrs)
+                        if (!used.has("with:" + k))
+                            items.push({
+                                label: `${UI.with} ${l}`,
+                                countKey: `with:${k}`,
+                                action: () => {
+                                    state.preds.push({ t: "with", k });
+                                    run();
+                                },
+                            });
+                }
+                const cont = Object.entries(nn.contains || {});
+                if (cont.length) {
+                    items.push({ section: UI.menu_nearby });
+                    for (const [k, l] of cont) {
+                        if (!used.has("nocontain:" + k))
+                            items.push({
+                                label: `${UI.with_no} ${l}`,
+                                countKey: `nocontain:${k}`,
+                                action: () => {
+                                    state.preds.push({ t: "nocontain", k });
+                                    run();
+                                },
+                            });
+                        if (!used.has("contain:" + k))
+                            items.push({
+                                label: `${UI.having} ${l}`,
+                                countKey: `contain:${k}`,
+                                action: () => {
+                                    state.preds.push({ t: "contain", k });
+                                    run();
+                                },
+                            });
+                    }
+                }
+                if (!state.preds.some((p) => p.t === "time")) {
+                    items.push({ section: UI.menu_fresh });
+                    for (const o of TIME_OPTS)
+                        items.push({
+                            label: o.label,
+                            countKey: `time:${o.key}`,
+                            action: () => {
+                                state.preds.push({ t: "time", k: o.key });
+                                run();
+                            },
+                        });
+                }
+                if (!state.place) {
+                    items.push({ section: UI.menu_where });
+                    items.push({ placePicker: true });
+                }
+                return items;
+            }
+            // typeahead over the (long) place list, sorted by how many results each place holds
+            function buildPlacePicker() {
+                const wrap = document.createElement("div");
+                const inp = document.createElement("input");
+                inp.className = "place-search";
+                inp.placeholder = UI.search_places ?? "type to filter…";
+                const list = document.createElement("div");
+                wrap.append(inp, list);
+                let counts = null;
+                const render = () => {
+                    const f = inp.value.trim().toLowerCase();
+                    const matched = places.filter((p) =>
+                        p.toLowerCase().includes(f),
+                    );
+                    if (counts)
+                        matched.sort(
+                            (a, b) =>
+                                (counts.get(b) ?? 0) - (counts.get(a) ?? 0) ||
+                                a.localeCompare(b),
+                        );
+                    list.innerHTML = "";
+                    for (const p of matched.slice(0, 12)) {
+                        const d = document.createElement("div");
+                        d.className = "item";
+                        d.innerHTML = `<span>${UI.in} ${p}</span><span class="n">${counts?.get(p)?.toLocaleString() ?? ""}</span>`;
+                        d.onclick = () => {
+                            closeMenu();
+                            state.place = p;
+                            run();
+                        };
+                        list.appendChild(d);
+                    }
+                    if (matched.length > 12) {
+                        const more = document.createElement("div");
+                        more.className = "section";
+                        more.textContent = `+ ${(matched.length - 12).toLocaleString()} — ${inp.placeholder}`;
+                        list.appendChild(more);
+                    }
+                };
+                inp.oninput = render;
+                inp.onkeydown = (e) => {
+                    if (e.key === "Enter") list.querySelector(".item")?.click();
+                };
+                render();
+                (async () => {
+                    if (!conn) return;
+                    try {
+                        const rows =
+                            await q(`SELECT place, count(*) AS c FROM ${tableUrl(state.noun)}
                             ${whereClauses(state, false)} GROUP BY place`);
-      counts = new Map(rows.filter((r) => r.place != null).map((r) => [r.place, Number(r.c)]));
-      render();
-    } catch { /* menu may have closed */ }
-  })();
-  setTimeout(() => inp.focus(), 0);
-  return wrap;
-}
-// counts inside the picker — the answer arrives before the question is finished
-async function fillMenuCounts(items) {
-  if (!conn) return;
-  const t = tableUrl(state.noun);
-  for (const it of items) {
-    if (!it.countKey) continue;
-    const [tt, k] = it.countKey.split(':');
-    const trial = { ...state, preds: [...state.preds, { t: tt, k }] };
-    try {
-      const [row] = await q(`SELECT count(*) AS c FROM ${t} ${whereClauses(trial)}`);
-      const el = menuEl.querySelector(`[data-count-key="${it.countKey}"]`);
-      if (el) el.textContent = Number(row.c).toLocaleString();
-    } catch { /* menu may have closed */ }
-  }
-}
+                        counts = new Map(
+                            rows
+                                .filter((r) => r.place != null)
+                                .map((r) => [r.place, Number(r.c)]),
+                        );
+                        render();
+                    } catch {
+                        /* menu may have closed */
+                    }
+                })();
+                setTimeout(() => inp.focus(), 0);
+                return wrap;
+            }
+            // counts inside the picker — the answer arrives before the question is finished
+            async function fillMenuCounts(items) {
+                if (!conn) return;
+                const t = tableUrl(state.noun);
+                for (const it of items) {
+                    if (!it.countKey) continue;
+                    const [tt, k] = it.countKey.split(":");
+                    const trial = {
+                        ...state,
+                        preds: [...state.preds, { t: tt, k }],
+                    };
+                    try {
+                        const [row] = await q(
+                            `SELECT count(*) AS c FROM ${t} ${whereClauses(trial)}`,
+                        );
+                        const el = menuEl.querySelector(
+                            `[data-count-key="${it.countKey}"]`,
+                        );
+                        if (el) el.textContent = Number(row.c).toLocaleString();
+                    } catch {
+                        /* menu may have closed */
+                    }
+                }
+            }
 
-// ---------------------------------------------------------------- scribble identity (needed at map init)
-// A mapper is a self-declared (color, handle) pair kept in localStorage —
-// no accounts. Captured in a first-load modal, editable later from the header.
-const PALETTE = ['#e91e63', '#2196f3', '#4caf50', '#ff9800', '#9c27b0', '#00bcd4', '#795548', '#607d8b'];
-let myColor = localStorage.scribbleColor ??
-  (localStorage.scribbleColor = PALETTE[Math.floor(Math.random() * PALETTE.length)]);
-let myHandle = localStorage.scribbleHandle ?? '';
-let mine = [];
-try { mine = JSON.parse(localStorage.scribbleMine ?? '[]'); } catch { mine = []; }
-let identityDraftColor = myColor;
+            // ---------------------------------------------------------------- scribble identity (needed at map init)
+            // A mapper is a self-declared (color, handle) pair kept in localStorage —
+            // no accounts. Captured in a first-load modal, editable later from the header.
+            const PALETTE = [
+                "#e91e63",
+                "#2196f3",
+                "#4caf50",
+                "#ff9800",
+                "#9c27b0",
+                "#00bcd4",
+                "#795548",
+                "#607d8b",
+            ];
+            let myColor =
+                localStorage.scribbleColor ??
+                (localStorage.scribbleColor =
+                    PALETTE[Math.floor(Math.random() * PALETTE.length)]);
+            let myHandle = localStorage.scribbleHandle ?? "";
+            let mine = [];
+            try {
+                mine = JSON.parse(localStorage.scribbleMine ?? "[]");
+            } catch {
+                mine = [];
+            }
+            let identityDraftColor = myColor;
 
-const identityBtn = document.getElementById('identity-btn');
-const identityModal = document.getElementById('identity-modal');
-const identityHandle = document.getElementById('identity-handle');
-const identitySwatches = document.getElementById('identity-swatches');
-const identitySave = document.getElementById('identity-save');
-const identityCancel = document.getElementById('identity-cancel');
-document.getElementById('identity-title').textContent = UI.identity_title ?? 'choose your scribble identity';
-document.getElementById('identity-handle-label').textContent = UI.identity_handle ?? 'handle';
-document.getElementById('identity-color-label').textContent = UI.identity_color ?? 'color';
-identityCancel.textContent = UI.cancel ?? 'cancel';
-identitySave.textContent = UI.save ?? 'save';
+            const identityBtn = document.getElementById("identity-btn");
+            const identityModal = document.getElementById("identity-modal");
+            const identityHandle = document.getElementById("identity-handle");
+            const identitySwatches =
+                document.getElementById("identity-swatches");
+            const identitySave = document.getElementById("identity-save");
+            const identityCancel = document.getElementById("identity-cancel");
+            document.getElementById("identity-title").textContent =
+                UI.identity_title ?? "choose your scribble identity";
+            document.getElementById("identity-handle-label").textContent =
+                UI.identity_handle ?? "handle";
+            document.getElementById("identity-color-label").textContent =
+                UI.identity_color ?? "color";
+            identityCancel.textContent = UI.cancel ?? "cancel";
+            identitySave.textContent = UI.save ?? "save";
 
-function updateIdentityButton() {
-  identityBtn.innerHTML = '';
-  const swatch = document.createElement('span');
-  swatch.className = 'swatch-dot';
-  swatch.style.background = myColor;
-  identityBtn.append(swatch, document.createTextNode(myHandle || (UI.identity_me ?? 'me')));
-}
-function renderIdentitySwatches() {
-  identitySwatches.innerHTML = '';
-  for (const color of PALETTE) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.style.background = color;
-    b.className = color === identityDraftColor ? 'active' : '';
-    b.onclick = () => { identityDraftColor = color; renderIdentitySwatches(); };
-    identitySwatches.appendChild(b);
-  }
-}
-function setIdentityOpen(open) {
-  identityModal.style.display = open ? 'flex' : 'none';
-  if (!open) return;
-  identityDraftColor = myColor;
-  identityHandle.value = myHandle;
-  renderIdentitySwatches();
-  setTimeout(() => identityHandle.focus(), 0);
-}
-identitySave.onclick = () => {
-  myHandle = identityHandle.value.trim().slice(0, 24);
-  myColor = identityDraftColor;
-  localStorage.scribbleHandle = myHandle;
-  localStorage.scribbleColor = myColor;
-  updateIdentityButton();
-  if (map?.getLayer?.('scribble-draft-line')) map.setPaintProperty('scribble-draft-line', 'line-color', myColor);
-  setIdentityOpen(false);
-};
-identityCancel.onclick = () => setIdentityOpen(false);
-identityBtn.onclick = () => setIdentityOpen(true);
-updateIdentityButton();
+            function updateIdentityButton() {
+                identityBtn.innerHTML = "";
+                const swatch = document.createElement("span");
+                swatch.className = "swatch-dot";
+                swatch.style.background = myColor;
+                identityBtn.append(
+                    swatch,
+                    document.createTextNode(
+                        myHandle || (UI.identity_me ?? "me"),
+                    ),
+                );
+            }
+            function renderIdentitySwatches() {
+                identitySwatches.innerHTML = "";
+                for (const color of PALETTE) {
+                    const b = document.createElement("button");
+                    b.type = "button";
+                    b.style.background = color;
+                    b.className = color === identityDraftColor ? "active" : "";
+                    b.onclick = () => {
+                        identityDraftColor = color;
+                        renderIdentitySwatches();
+                    };
+                    identitySwatches.appendChild(b);
+                }
+            }
+            function setIdentityOpen(open) {
+                identityModal.style.display = open ? "flex" : "none";
+                if (!open) return;
+                identityDraftColor = myColor;
+                identityHandle.value = myHandle;
+                renderIdentitySwatches();
+                setTimeout(() => identityHandle.focus(), 0);
+            }
+            identitySave.onclick = () => {
+                myHandle = identityHandle.value.trim().slice(0, 24);
+                myColor = identityDraftColor;
+                localStorage.scribbleHandle = myHandle;
+                localStorage.scribbleColor = myColor;
+                updateIdentityButton();
+                if (map?.getLayer?.("scribble-draft-line"))
+                    map.setPaintProperty(
+                        "scribble-draft-line",
+                        "line-color",
+                        myColor,
+                    );
+                setIdentityOpen(false);
+            };
+            identityCancel.onclick = () => setIdentityOpen(false);
+            identityBtn.onclick = () => setIdentityOpen(true);
+            updateIdentityButton();
 
-// ---------------------------------------------------------------- map (MapLibre GL)
-// Draw each stamp emoji to a canvas and register it as a map image (id = the
-// glyph itself, so `['get','g']` resolves directly). Canvas uses the system
-// colour-emoji font, which the vector glyph pipeline cannot.
-function addStampImages() {
-  const px = 44, ratio = 2, size = px * ratio;
-  for (const g of STAMP_GLYPHS) {
-    if (map.hasImage(g)) continue;
-    const c = document.createElement('canvas');
-    c.width = c.height = size;
-    const ctx = c.getContext('2d');
-    ctx.font = `${Math.round(size * 0.78)}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(g, size / 2, size / 2 + size * 0.04);
-    map.addImage(g, ctx.getImageData(0, 0, size, size), { pixelRatio: ratio });
-  }
-}
+            // ---------------------------------------------------------------- map (MapLibre GL)
+            // Draw each stamp emoji to a canvas and register it as a map image (id = the
+            // glyph itself, so `['get','g']` resolves directly). Canvas uses the system
+            // colour-emoji font, which the vector glyph pipeline cannot.
+            function addStampImages() {
+                const px = 44,
+                    ratio = 2,
+                    size = px * ratio;
+                for (const g of STAMP_GLYPHS) {
+                    if (map.hasImage(g)) continue;
+                    const c = document.createElement("canvas");
+                    c.width = c.height = size;
+                    const ctx = c.getContext("2d");
+                    ctx.font = `${Math.round(size * 0.78)}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`;
+                    ctx.textAlign = "center";
+                    ctx.textBaseline = "middle";
+                    ctx.fillText(g, size / 2, size / 2 + size * 0.04);
+                    map.addImage(g, ctx.getImageData(0, 0, size, size), {
+                        pixelRatio: ratio,
+                    });
+                }
+            }
 
-// Text scribbles have no fixed glyph set, so each unique string+colour is
-// rasterised on demand (system font, no glyph pipeline needed) and registered
-// under its deterministic key, then placed as an icon like a stamp.
-function ensureTextImage(c, text) {
-  const key = textImageKey(c, text);
-  if (map.hasImage(key)) return;
-  const ratio = 2, font = 40 * ratio, pad = 10 * ratio;
-  const measure = document.createElement('canvas').getContext('2d');
-  measure.font = `700 ${font}px -apple-system, "Segoe UI", sans-serif`;
-  const w = Math.ceil(measure.measureText(text).width) + pad * 2;
-  const h = Math.round(font * 1.3);
-  const canvas = document.createElement('canvas');
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext('2d');
-  ctx.font = measure.font;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = c;
-  ctx.fillText(text, w / 2, h / 2);
-  map.addImage(key, ctx.getImageData(0, 0, w, h), { pixelRatio: ratio });
-}
+            // Text scribbles have no fixed glyph set, so each unique string+colour is
+            // rasterised on demand (system font, no glyph pipeline needed) and registered
+            // under its deterministic key, then placed as an icon like a stamp.
+            function ensureTextImage(c, text) {
+                const key = textImageKey(c, text);
+                if (map.hasImage(key)) return;
+                const ratio = 2,
+                    font = 40 * ratio,
+                    pad = 10 * ratio;
+                const measure = document
+                    .createElement("canvas")
+                    .getContext("2d");
+                measure.font = `700 ${font}px -apple-system, "Segoe UI", sans-serif`;
+                const w = Math.ceil(measure.measureText(text).width) + pad * 2;
+                const h = Math.round(font * 1.3);
+                const canvas = document.createElement("canvas");
+                canvas.width = w;
+                canvas.height = h;
+                const ctx = canvas.getContext("2d");
+                ctx.font = measure.font;
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillStyle = c;
+                ctx.fillText(text, w / 2, h / 2);
+                map.addImage(key, ctx.getImageData(0, 0, w, h), {
+                    pixelRatio: ratio,
+                });
+            }
 
-// One scale pattern for everything we put on the map: full size at z15+,
-// shrinking linearly to a fraction at z9 so symbols don't swamp a zoomed-out view.
-const zoomScale = (min, max) => ['interpolate', ['linear'], ['zoom'], 9, min, 15, max];
+            // One scale pattern for everything we put on the map: full size at z15+,
+            // shrinking linearly to a fraction at z9 so symbols don't swamp a zoomed-out view.
+            const zoomScale = (min, max) => [
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                9,
+                min,
+                15,
+                max,
+            ];
 
-const map = new maplibregl.Map({
-  container: 'map',
-  center: REGION.map_center,
-  zoom: REGION.map_zoom,
-  style: {
-    version: 8,
-    sources: {
-      osm: { type: 'raster', tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-             tileSize: 256, attribution: '© OpenStreetMap contributors' },
-    },
-    layers: [{ id: 'osm', type: 'raster', source: 'osm' }],
-  },
-});
-map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
-const mapReady = new Promise((res) => map.on('load', () => {
-  map.addSource('bounds', { type: 'geojson', data: 'boundaries.geojson' });
-  map.addLayer({ id: 'bounds-line', type: 'line', source: 'bounds',
-    paint: { 'line-color': '#666', 'line-width': 1, 'line-dasharray': [3, 2] } });
-  map.addSource('dots', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-  map.addLayer({ id: 'dots-circle', type: 'circle', source: 'dots',
-    paint: { 'circle-radius': zoomScale(5, 11), 'circle-color': '#ab47bc', 'circle-opacity': 0.8,
-             'circle-stroke-width': zoomScale(1, 2), 'circle-stroke-color': '#7b1fa2' } });
-  map.on('click', 'dots-circle', (e) => {
-    const p = e.features[0].properties;
-    const osmUrl = `https://www.openstreetmap.org/${p.osm_type}/${p.osm_id}`;
-    const idUrl = `https://www.openstreetmap.org/edit?${p.osm_type}=${p.osm_id}`;
-    new maplibregl.Popup().setLngLat(e.lngLat).setHTML(
-      `<b>${p.name}</b><br>${UI.last_edited} ${p.ts}<br>
-       <a href="${osmUrl}" target="_blank">${UI.view_osm}</a> · <a href="${idUrl}" target="_blank">${UI.fix_id}</a>`
-    ).addTo(map);
-  });
-  map.on('mouseenter', 'dots-circle', () => map.getCanvas().style.cursor = 'pointer');
-  map.on('mouseleave', 'dots-circle', () => map.getCanvas().style.cursor = '');
-  map.addSource('scribble-lines', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-  map.addLayer({ id: 'scribbles-line', type: 'line', source: 'scribble-lines',
-    layout: { 'line-cap': 'round', 'line-join': 'round' },
-    paint: { 'line-color': ['get', 'c'], 'line-width': zoomScale(2, 4.5), 'line-opacity': 0.85 } });
-  map.addSource('scribble-stamps', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-  // MapLibre renders text-field as SDF glyphs, which don't include colour emoji.
-  // Rasterise each emoji via canvas (system emoji font) and use it as an icon.
-  addStampImages();
-  map.addLayer({ id: 'scribble-stamp-labels', type: 'symbol', source: 'scribble-stamps',
-    layout: { 'icon-image': ['get', 'g'], 'icon-size': zoomScale(0.4, 0.65), 'icon-allow-overlap': true,
-              'icon-ignore-placement': true } });
-  map.addSource('scribble-draft', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-  map.addLayer({ id: 'scribble-draft-line', type: 'line', source: 'scribble-draft',
-    layout: { 'line-cap': 'round', 'line-join': 'round' },
-    paint: { 'line-color': myColor, 'line-width': zoomScale(2, 4.5), 'line-opacity': 0.6 } });
-  res();
-}));
+            const map = new maplibregl.Map({
+                container: "map",
+                center: REGION.map_center,
+                zoom: REGION.map_zoom,
+                style: {
+                    version: 8,
+                    sources: {
+                        osm: {
+                            type: "raster",
+                            tiles: [
+                                "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+                            ],
+                            tileSize: 256,
+                            attribution: "© OpenStreetMap contributors",
+                        },
+                    },
+                    layers: [{ id: "osm", type: "raster", source: "osm" }],
+                },
+            });
+            map.addControl(
+                new maplibregl.NavigationControl({ showCompass: false }),
+                "top-right",
+            );
+            const mapReady = new Promise((res) =>
+                map.on("load", () => {
+                    map.addSource("bounds", {
+                        type: "geojson",
+                        data: "boundaries.geojson",
+                    });
+                    map.addLayer({
+                        id: "bounds-line",
+                        type: "line",
+                        source: "bounds",
+                        paint: {
+                            "line-color": "#666",
+                            "line-width": 1,
+                            "line-dasharray": [3, 2],
+                        },
+                    });
+                    map.addSource("dots", {
+                        type: "geojson",
+                        data: { type: "FeatureCollection", features: [] },
+                    });
+                    map.addLayer({
+                        id: "dots-circle",
+                        type: "circle",
+                        source: "dots",
+                        paint: {
+                            "circle-radius": zoomScale(5, 11),
+                            "circle-color": "#ab47bc",
+                            "circle-opacity": 0.8,
+                            "circle-stroke-width": zoomScale(1, 2),
+                            "circle-stroke-color": "#7b1fa2",
+                        },
+                    });
+                    map.on("click", "dots-circle", (e) => {
+                        const p = e.features[0].properties;
+                        const osmUrl = `https://www.openstreetmap.org/${p.osm_type}/${p.osm_id}`;
+                        const idUrl = `https://www.openstreetmap.org/edit?${p.osm_type}=${p.osm_id}`;
+                        new maplibregl.Popup()
+                            .setLngLat(e.lngLat)
+                            .setHTML(
+                                `<b>${p.name}</b><br>${UI.last_edited} ${p.ts}<br>
+       <a href="${osmUrl}" target="_blank">${UI.view_osm}</a> · <a href="${idUrl}" target="_blank">${UI.fix_id}</a>`,
+                            )
+                            .addTo(map);
+                    });
+                    map.on(
+                        "mouseenter",
+                        "dots-circle",
+                        () => (map.getCanvas().style.cursor = "pointer"),
+                    );
+                    map.on(
+                        "mouseleave",
+                        "dots-circle",
+                        () => (map.getCanvas().style.cursor = ""),
+                    );
+                    map.addSource("scribble-lines", {
+                        type: "geojson",
+                        data: { type: "FeatureCollection", features: [] },
+                    });
+                    map.addLayer({
+                        id: "scribbles-line",
+                        type: "line",
+                        source: "scribble-lines",
+                        layout: { "line-cap": "round", "line-join": "round" },
+                        paint: {
+                            "line-color": ["get", "c"],
+                            "line-width": zoomScale(2, 4.5),
+                            "line-opacity": 0.85,
+                        },
+                    });
+                    map.addSource("scribble-stamps", {
+                        type: "geojson",
+                        data: { type: "FeatureCollection", features: [] },
+                    });
+                    // MapLibre renders text-field as SDF glyphs, which don't include colour emoji.
+                    // Rasterise each emoji via canvas (system emoji font) and use it as an icon.
+                    addStampImages();
+                    map.addLayer({
+                        id: "scribble-stamp-labels",
+                        type: "symbol",
+                        source: "scribble-stamps",
+                        layout: {
+                            "icon-image": ["get", "g"],
+                            "icon-size": zoomScale(0.4, 0.65),
+                            "icon-allow-overlap": true,
+                            "icon-ignore-placement": true,
+                        },
+                    });
+                    map.addSource("scribble-draft", {
+                        type: "geojson",
+                        data: { type: "FeatureCollection", features: [] },
+                    });
+                    map.addLayer({
+                        id: "scribble-draft-line",
+                        type: "line",
+                        source: "scribble-draft",
+                        layout: { "line-cap": "round", "line-join": "round" },
+                        paint: {
+                            "line-color": myColor,
+                            "line-width": zoomScale(2, 4.5),
+                            "line-opacity": 0.6,
+                        },
+                    });
+                    res();
+                }),
+            );
 
-// ---------------------------------------------------------------- scribbles (shared, dumb)
-// Each stroke is one JSON line POSTed to serve.py; everyone polls the
-// append-only JSONL back. Erase = tombstone line. On static hosts the
-// /api/ping probe 404s and the draw tools stay hidden.
-const undoBtn = document.getElementById('undo-btn');
-const drawToolbar = document.getElementById('draw-toolbar');
-const penTool = document.getElementById('pen-tool');
-const textTool = document.getElementById('text-tool');
-let drawMode = false, scribbleOK = false, scribblesVisible = true;
-let activeTool = 'pen';
-let activeStamp = STAMP_GLYPHS[0];
+            // ---------------------------------------------------------------- scribbles (shared, dumb)
+            // Each stroke is one JSON line POSTed to serve.py; everyone polls the
+            // append-only JSONL back. Erase = tombstone line. On static hosts the
+            // /api/ping probe 404s and the draw tools stay hidden.
+            const undoBtn = document.getElementById("undo-btn");
+            const drawToolbar = document.getElementById("draw-toolbar");
+            const penTool = document.getElementById("pen-tool");
+            const textTool = document.getElementById("text-tool");
+            let drawMode = false,
+                scribbleOK = false,
+                scribblesVisible = true;
+            let activeTool = "pen";
+            let activeStamp = STAMP_GLYPHS[0];
 
-// Draw on/off and layer show/hide are map context, so they live on the map
-// as a MapLibre control rather than in the page header.
-const SCRIBBLE_LAYERS = ['scribbles-line', 'scribble-stamp-labels', 'scribble-draft-line'];
-const drawCtrlBtn = document.createElement('button');
-const layerCtrlBtn = document.createElement('button');
-drawCtrlBtn.className = layerCtrlBtn.className = 'ctrl-emoji';
-drawCtrlBtn.type = layerCtrlBtn.type = 'button';
-drawCtrlBtn.textContent = '✏️';
-layerCtrlBtn.textContent = '👁️';
-const scribbleControl = {
-  onAdd() {
-    const div = document.createElement('div');
-    div.className = 'maplibregl-ctrl maplibregl-ctrl-group';
-    div.append(drawCtrlBtn, layerCtrlBtn);
-    return div;
-  },
-  onRemove() {},
-};
-function setScribblesVisible(on) {
-  scribblesVisible = on;
-  layerCtrlBtn.classList.toggle('off', !on);
-  layerCtrlBtn.title = on ? (UI.scribbles_hide ?? 'hide scribbles') : (UI.scribbles_show ?? 'show scribbles');
-  for (const id of SCRIBBLE_LAYERS)
-    map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
-  if (!on && drawMode) setDrawMode(false);
-}
-layerCtrlBtn.onclick = () => setScribblesVisible(!scribblesVisible);
+            // Draw on/off and layer show/hide are map context, so they live on the map
+            // as a MapLibre control rather than in the page header.
+            const SCRIBBLE_LAYERS = [
+                "scribbles-line",
+                "scribble-stamp-labels",
+                "scribble-draft-line",
+            ];
+            const drawCtrlBtn = document.createElement("button");
+            const layerCtrlBtn = document.createElement("button");
+            drawCtrlBtn.className = layerCtrlBtn.className = "ctrl-emoji";
+            drawCtrlBtn.type = layerCtrlBtn.type = "button";
+            drawCtrlBtn.textContent = "✏️";
+            layerCtrlBtn.textContent = "👁️";
+            const scribbleControl = {
+                onAdd() {
+                    const div = document.createElement("div");
+                    div.className = "maplibregl-ctrl maplibregl-ctrl-group";
+                    div.append(drawCtrlBtn, layerCtrlBtn);
+                    return div;
+                },
+                onRemove() {},
+            };
+            function setScribblesVisible(on) {
+                scribblesVisible = on;
+                layerCtrlBtn.classList.toggle("off", !on);
+                layerCtrlBtn.title = on
+                    ? (UI.scribbles_hide ?? "hide scribbles")
+                    : (UI.scribbles_show ?? "show scribbles");
+                for (const id of SCRIBBLE_LAYERS)
+                    map.setLayoutProperty(
+                        id,
+                        "visibility",
+                        on ? "visible" : "none",
+                    );
+                if (!on && drawMode) setDrawMode(false);
+            }
+            layerCtrlBtn.onclick = () => setScribblesVisible(!scribblesVisible);
 
-function renderScribbles(text) {
-  const strokes = parseScribbles(text);
-  for (const s of strokes) if (s.tx) ensureTextImage(s.c, s.tx);
-  const features = toFeatures(strokes);
-  map.getSource('scribble-lines')?.setData(features.lines);
-  map.getSource('scribble-stamps')?.setData(features.stamps);
-  const liveIds = new Set(strokes.map((s) => s.id));
-  mine = mine.filter((id) => liveIds.has(id));
-  localStorage.scribbleMine = JSON.stringify(mine);
-  undoBtn.style.display = scribbleOK && mine.length ? '' : 'none';
-}
-async function pollScribbles() {
-  if (document.hidden) return;
-  try {
-    const r = await fetch(`../party/scribbles.jsonl?t=${Date.now()}`);
-    if (r.ok) renderScribbles(await r.text());
-  } catch { /* server gone — keep last state, retry next tick */ }
-}
-async function postScribble(msg) {
-  const r = await fetch('../api/scribble', { method: 'POST', body: JSON.stringify(msg) });
-  if (!r.ok) console.warn('scribble rejected', r.status);
-  pollScribbles();
-}
+            function renderScribbles(text) {
+                const strokes = parseScribbles(text);
+                for (const s of strokes) if (s.tx) ensureTextImage(s.c, s.tx);
+                const features = toFeatures(strokes);
+                map.getSource("scribble-lines")?.setData(features.lines);
+                map.getSource("scribble-stamps")?.setData(features.stamps);
+                const liveIds = new Set(strokes.map((s) => s.id));
+                mine = mine.filter((id) => liveIds.has(id));
+                localStorage.scribbleMine = JSON.stringify(mine);
+                undoBtn.style.display = scribbleOK && mine.length ? "" : "none";
+            }
+            async function pollScribbles() {
+                if (document.hidden) return;
+                try {
+                    const r = await fetch(
+                        `../party/scribbles.jsonl?t=${Date.now()}`,
+                    );
+                    if (r.ok) renderScribbles(await r.text());
+                } catch {
+                    /* server gone — keep last state, retry next tick */
+                }
+            }
+            async function postScribble(msg) {
+                const r = await fetch("../api/scribble", {
+                    method: "POST",
+                    body: JSON.stringify(msg),
+                });
+                if (!r.ok) console.warn("scribble rejected", r.status);
+                pollScribbles();
+            }
 
-function setActiveTool(tool, stamp = activeStamp) {
-  activeTool = tool;
-  activeStamp = stamp;
-  penTool.classList.toggle('active', activeTool === 'pen');
-  textTool.classList.toggle('active', activeTool === 'text');
-  document.querySelectorAll('#draw-toolbar .stamp[data-stamp]').forEach((b) => {
-    b.classList.toggle('active', activeTool === 'stamp' && b.dataset.stamp === activeStamp);
-  });
-}
-function setDrawMode(on) {
-  drawMode = on;
-  if (on && !scribblesVisible) setScribblesVisible(true);
-  drawCtrlBtn.classList.toggle('active', on);
-  drawCtrlBtn.title = on ? (UI.drawing ?? 'drawing — tap to stop') : (UI.draw ?? 'draw');
-  drawToolbar.style.display = scribbleOK && on ? 'flex' : 'none';
-  document.getElementById('draw-frame').style.display = on ? 'block' : 'none';
-  const canvas = map.getCanvas();
-  canvas.style.cursor = on ? 'crosshair' : '';
-  canvas.style.touchAction = on ? 'none' : '';
-  on ? map.dragPan.disable() : map.dragPan.enable();
-}
-drawCtrlBtn.onclick = () => setDrawMode(!drawMode);
-undoBtn.onclick = () => {
-  const id = mine.pop();
-  localStorage.scribbleMine = JSON.stringify(mine);
-  if (id) postScribble({ t: 'e', id });
-};
-penTool.textContent = '✏️';
-penTool.title = UI.pen_tool ?? 'pen';
-penTool.onclick = () => setActiveTool('pen');
-textTool.title = UI.text_tool ?? 'text';
-textTool.onclick = () => setActiveTool('text');
-document.querySelectorAll('#draw-toolbar .stamp[data-stamp]').forEach((b) => {
-  b.title = `${UI.stamp_tool ?? 'stamp'} ${b.dataset.stamp}`;
-  b.onclick = () => setActiveTool('stamp', b.dataset.stamp);
-});
-setActiveTool('pen');
+            function setActiveTool(tool, stamp = activeStamp) {
+                activeTool = tool;
+                activeStamp = stamp;
+                penTool.classList.toggle("active", activeTool === "pen");
+                textTool.classList.toggle("active", activeTool === "text");
+                document
+                    .querySelectorAll("#draw-toolbar .stamp[data-stamp]")
+                    .forEach((b) => {
+                        b.classList.toggle(
+                            "active",
+                            activeTool === "stamp" &&
+                                b.dataset.stamp === activeStamp,
+                        );
+                    });
+            }
+            function setDrawMode(on) {
+                drawMode = on;
+                if (on && !scribblesVisible) setScribblesVisible(true);
+                drawCtrlBtn.classList.toggle("active", on);
+                drawCtrlBtn.title = on
+                    ? (UI.drawing ?? "drawing — tap to stop")
+                    : (UI.draw ?? "draw");
+                drawToolbar.style.display = scribbleOK && on ? "flex" : "none";
+                document.getElementById("draw-frame").style.display = on
+                    ? "block"
+                    : "none";
+                const canvas = map.getCanvas();
+                canvas.style.cursor = on ? "crosshair" : "";
+                canvas.style.touchAction = on ? "none" : "";
+                on ? map.dragPan.disable() : map.dragPan.enable();
+            }
+            drawCtrlBtn.onclick = () => setDrawMode(!drawMode);
+            undoBtn.onclick = () => {
+                const id = mine.pop();
+                localStorage.scribbleMine = JSON.stringify(mine);
+                if (id) postScribble({ t: "e", id });
+            };
+            penTool.textContent = "✏️";
+            penTool.title = UI.pen_tool ?? "pen";
+            penTool.onclick = () => setActiveTool("pen");
+            textTool.title = UI.text_tool ?? "text";
+            textTool.onclick = () => setActiveTool("text");
+            document
+                .querySelectorAll("#draw-toolbar .stamp[data-stamp]")
+                .forEach((b) => {
+                    b.title = `${UI.stamp_tool ?? "stamp"} ${b.dataset.stamp}`;
+                    b.onclick = () => setActiveTool("stamp", b.dataset.stamp);
+                });
+            setActiveTool("pen");
 
-let stroke = null, lastPx = null;
-const px2ll = (e) => {
-  const r = map.getCanvas().getBoundingClientRect();
-  const ll = map.unproject([e.clientX - r.left, e.clientY - r.top]);
-  return [+ll.lng.toFixed(6), +ll.lat.toFixed(6)];
-};
-function draftData() {
-  return { type: 'FeatureCollection', features: stroke && stroke.length > 1 ? [{
-    type: 'Feature', geometry: { type: 'LineString', coordinates: stroke }, properties: {} }] : [] };
-}
-mapReady.then(() => {
-  const canvas = map.getCanvas();
-  canvas.addEventListener('pointerdown', (e) => {
-    if (!drawMode || !e.isPrimary) return;
-    e.preventDefault();
-    if (activeTool === 'stamp' || activeTool === 'text') {
-      let tx;
-      if (activeTool === 'text') {
-        tx = (prompt(UI.text_prompt ?? 'text label:') ?? '').trim().slice(0, 40);
-        if (!tx) return;
-      }
-      const id = [...crypto.getRandomValues(new Uint8Array(4))].map((b) => b.toString(16).padStart(2, '0')).join('');
-      mine.push(id);
-      localStorage.scribbleMine = JSON.stringify(mine);
-      const msg = { t: 's', id, c: myColor, h: myHandle, pts: [px2ll(e)] };
-      tx ? (msg.tx = tx) : (msg.g = activeStamp);
-      postScribble(msg);
-      return;
-    }
-    canvas.setPointerCapture(e.pointerId);
-    stroke = [px2ll(e)];
-    lastPx = [e.clientX, e.clientY];
-  });
-  canvas.addEventListener('pointermove', (e) => {
-    if (!stroke || !e.isPrimary) return;
-    if (Math.hypot(e.clientX - lastPx[0], e.clientY - lastPx[1]) < 3) return;
-    lastPx = [e.clientX, e.clientY];
-    stroke.push(px2ll(e));
-    map.getSource('scribble-draft').setData(draftData());
-  });
-  canvas.addEventListener('pointerup', (e) => {
-    if (!stroke || !e.isPrimary) return;
-    const pts = stroke;
-    stroke = null;
-    map.getSource('scribble-draft').setData(draftData());
-    if (pts.length < 2) return;
-    const id = [...crypto.getRandomValues(new Uint8Array(4))].map((b) => b.toString(16).padStart(2, '0')).join('');
-    mine.push(id);
-    localStorage.scribbleMine = JSON.stringify(mine);
-    postScribble({ t: 's', id, c: myColor, h: myHandle, pts });
-  });
-});
-(async () => {
-  try { scribbleOK = (await fetch('../api/ping')).ok; } catch { /* static host */ }
-  if (!scribbleOK) return;
-  identityBtn.style.display = 'inline-flex';
-  drawCtrlBtn.title = UI.draw ?? 'draw';
-  layerCtrlBtn.title = UI.scribbles_hide ?? 'hide scribbles';
-  undoBtn.title = UI.undo_scribble ?? 'undo my last';
-  await mapReady;
-  map.addControl(scribbleControl, 'top-right');
-  pollScribbles();
-  setInterval(pollScribbles, 3000);
-})();
+            let stroke = null,
+                lastPx = null;
+            const px2ll = (e) => {
+                const r = map.getCanvas().getBoundingClientRect();
+                const ll = map.unproject([
+                    e.clientX - r.left,
+                    e.clientY - r.top,
+                ]);
+                return [+ll.lng.toFixed(6), +ll.lat.toFixed(6)];
+            };
+            function draftData() {
+                return {
+                    type: "FeatureCollection",
+                    features:
+                        stroke && stroke.length > 1
+                            ? [
+                                  {
+                                      type: "Feature",
+                                      geometry: {
+                                          type: "LineString",
+                                          coordinates: stroke,
+                                      },
+                                      properties: {},
+                                  },
+                              ]
+                            : [],
+                };
+            }
+            mapReady.then(() => {
+                const canvas = map.getCanvas();
+                canvas.addEventListener("pointerdown", (e) => {
+                    if (!drawMode || !e.isPrimary) return;
+                    e.preventDefault();
+                    if (activeTool === "stamp" || activeTool === "text") {
+                        let tx;
+                        if (activeTool === "text") {
+                            tx = (prompt(UI.text_prompt ?? "text label:") ?? "")
+                                .trim()
+                                .slice(0, 40);
+                            if (!tx) return;
+                        }
+                        const id = [
+                            ...crypto.getRandomValues(new Uint8Array(4)),
+                        ]
+                            .map((b) => b.toString(16).padStart(2, "0"))
+                            .join("");
+                        mine.push(id);
+                        localStorage.scribbleMine = JSON.stringify(mine);
+                        const msg = {
+                            t: "s",
+                            id,
+                            c: myColor,
+                            h: myHandle,
+                            pts: [px2ll(e)],
+                        };
+                        tx ? (msg.tx = tx) : (msg.g = activeStamp);
+                        postScribble(msg);
+                        return;
+                    }
+                    canvas.setPointerCapture(e.pointerId);
+                    stroke = [px2ll(e)];
+                    lastPx = [e.clientX, e.clientY];
+                });
+                canvas.addEventListener("pointermove", (e) => {
+                    if (!stroke || !e.isPrimary) return;
+                    if (
+                        Math.hypot(
+                            e.clientX - lastPx[0],
+                            e.clientY - lastPx[1],
+                        ) < 3
+                    )
+                        return;
+                    lastPx = [e.clientX, e.clientY];
+                    stroke.push(px2ll(e));
+                    map.getSource("scribble-draft").setData(draftData());
+                });
+                canvas.addEventListener("pointerup", (e) => {
+                    if (!stroke || !e.isPrimary) return;
+                    const pts = stroke;
+                    stroke = null;
+                    map.getSource("scribble-draft").setData(draftData());
+                    if (pts.length < 2) return;
+                    const id = [...crypto.getRandomValues(new Uint8Array(4))]
+                        .map((b) => b.toString(16).padStart(2, "0"))
+                        .join("");
+                    mine.push(id);
+                    localStorage.scribbleMine = JSON.stringify(mine);
+                    postScribble({ t: "s", id, c: myColor, h: myHandle, pts });
+                });
+            });
+            (async () => {
+                try {
+                    scribbleOK = (await fetch("../api/ping")).ok;
+                } catch {
+                    /* static host */
+                }
+                if (!scribbleOK) return;
+                identityBtn.style.display = "inline-flex";
+                drawCtrlBtn.title = UI.draw ?? "draw";
+                layerCtrlBtn.title = UI.scribbles_hide ?? "hide scribbles";
+                undoBtn.title = UI.undo_scribble ?? "undo my last";
+                await mapReady;
+                map.addControl(scribbleControl, "top-right");
+                pollScribbles();
+                setInterval(pollScribbles, 3000);
+            })();
 
-// ---------------------------------------------------------------- party pad + report links
-(async () => {
-  const links = document.getElementById('share-links');
-  try {
-    const party = await (await fetch('party.json')).json();
-    if (party.pad_url) links.innerHTML +=
-      `<a href="${party.pad_url}" target="_blank">📝 ${UI.pad_link ?? 'party pad'}</a><br>`;
-  } catch { /* no party.json — pad link just doesn't show */ }
-  links.innerHTML += `<a href="report.html" target="_blank">🖍️ ${UI.report_link ?? 'party report'}</a>`;
-})();
+            // ---------------------------------------------------------------- party pad + report links
+            (async () => {
+                const links = document.getElementById("share-links");
+                try {
+                    const party = await (await fetch("party.json")).json();
+                    if (party.pad_url)
+                        links.innerHTML += `<a href="${party.pad_url}" target="_blank">📝 ${UI.pad_link ?? "party pad"}</a><br>`;
+                } catch {
+                    /* no party.json — pad link just doesn't show */
+                }
+                links.innerHTML += `<a href="report.html" target="_blank">🖍️ ${UI.report_link ?? "party report"}</a>`;
+            })();
 
-// ---------------------------------------------------------------- share (copy link + QR for the room)
-const sharePanel = document.getElementById('share-panel');
-const shareBtn = document.getElementById('share-btn');
-const copyBtn = document.getElementById('share-copy');
-shareBtn.textContent = UI.share ?? 'share';
-copyBtn.textContent = UI.copy_link ?? 'copy link';
-document.getElementById('share-hint').textContent = UI.share_hint ?? 'scan to open this sentence';
-document.getElementById('share-join-label').textContent = UI.join_at ?? 'join at';
-document.getElementById('share-join').textContent = location.host;
-const shareUrl = document.getElementById('share-url');
-function renderShareQR() {
-  if (sharePanel.style.display !== 'block') return;
-  const code = qrcode(0, 'M');
-  code.addData(location.href);
-  code.make();
-  document.getElementById('share-qr').innerHTML = code.createSvgTag({ scalable: true, margin: 2 });
-  shareUrl.value = location.href;
-}
-shareUrl.onclick = () => shareUrl.select();
-shareBtn.onclick = (e) => {
-  e.stopPropagation();
-  sharePanel.style.display = sharePanel.style.display === 'block' ? 'none' : 'block';
-  renderShareQR();
-};
-copyBtn.onclick = async () => {
-  let ok = false;
-  if (navigator.clipboard) {
-    try { await navigator.clipboard.writeText(location.href); ok = true; } catch { /* fall through */ }
-  }
-  if (!ok) {
-    // http:// LAN origin: no clipboard API — legacy path via the visible url field
-    shareUrl.select();
-    ok = document.execCommand('copy');
-  }
-  copyBtn.textContent = ok ? (UI.copied ?? 'copied ✓') : (UI.copy_failed ?? 'select the link above');
-  setTimeout(() => copyBtn.textContent = UI.copy_link ?? 'copy link', 2000);
-};
-document.addEventListener('click', (e) => {
-  if (!sharePanel.contains(e.target) && e.target !== shareBtn) sharePanel.style.display = 'none';
-});
-// a shared link pasted into an already-open tab takes effect immediately
-addEventListener('hashchange', () => {
-  if (location.hash.slice(1) === myHash) return;
-  try { state = JSON.parse(decodeURIComponent(location.hash.slice(1))); run(); } catch { /* ignore junk */ }
-});
+            // ---------------------------------------------------------------- share (copy link + QR for the room)
+            const sharePanel = document.getElementById("share-panel");
+            const shareBtn = document.getElementById("share-btn");
+            const copyBtn = document.getElementById("share-copy");
+            shareBtn.textContent = UI.share ?? "share";
+            copyBtn.textContent = UI.copy_link ?? "copy link";
+            document.getElementById("share-hint").textContent =
+                UI.share_hint ?? "scan to open this sentence";
+            document.getElementById("share-join-label").textContent =
+                UI.join_at ?? "join at";
+            document.getElementById("share-join").textContent = location.host;
+            const shareUrl = document.getElementById("share-url");
+            function renderShareQR() {
+                if (sharePanel.style.display !== "block") return;
+                const code = qrcode(0, "M");
+                code.addData(location.href);
+                code.make();
+                document.getElementById("share-qr").innerHTML =
+                    code.createSvgTag({ scalable: true, margin: 2 });
+                shareUrl.value = location.href;
+            }
+            shareUrl.onclick = () => shareUrl.select();
+            shareBtn.onclick = (e) => {
+                e.stopPropagation();
+                sharePanel.style.display =
+                    sharePanel.style.display === "block" ? "none" : "block";
+                renderShareQR();
+            };
+            copyBtn.onclick = async () => {
+                let ok = false;
+                if (navigator.clipboard) {
+                    try {
+                        await navigator.clipboard.writeText(location.href);
+                        ok = true;
+                    } catch {
+                        /* fall through */
+                    }
+                }
+                if (!ok) {
+                    // http:// LAN origin: no clipboard API — legacy path via the visible url field
+                    shareUrl.select();
+                    ok = document.execCommand("copy");
+                }
+                copyBtn.textContent = ok
+                    ? (UI.copied ?? "copied ✓")
+                    : (UI.copy_failed ?? "select the link above");
+                setTimeout(
+                    () => (copyBtn.textContent = UI.copy_link ?? "copy link"),
+                    2000,
+                );
+            };
+            document.addEventListener("click", (e) => {
+                if (!sharePanel.contains(e.target) && e.target !== shareBtn)
+                    sharePanel.style.display = "none";
+            });
+            // a shared link pasted into an already-open tab takes effect immediately
+            addEventListener("hashchange", () => {
+                if (location.hash.slice(1) === myHash) return;
+                try {
+                    state = JSON.parse(
+                        decodeURIComponent(location.hash.slice(1)),
+                    );
+                    run();
+                } catch {
+                    /* ignore junk */
+                }
+            });
 
-// ---------------------------------------------------------------- boot
-const exBox = document.getElementById('examples');
-EXAMPLES.forEach((ex) => {
-  const b = document.createElement('button');
-  b.textContent = ex.label;
-  b.onclick = () => { state = structuredClone(ex.state); run(); };
-  exBox.appendChild(b);
-});
-if (location.hash.length > 2) {
-  try { state = JSON.parse(decodeURIComponent(location.hash.slice(1))); } catch { /* keep default */ }
-}
-renderSentence();
-(async () => {
-  places = (await (await fetch('places.json')).json()).map((r) => r.name);
-  await initDB();
-  document.getElementById('loading-overlay').style.display = 'none';
-  run();
-})().catch((e) => { status(UI.engine_failed); console.error(e); });
-</script>
-</body>
+            // ---------------------------------------------------------------- boot
+            const exBox = document.getElementById("examples");
+            EXAMPLES.forEach((ex) => {
+                const b = document.createElement("button");
+                b.textContent = ex.label;
+                b.onclick = () => {
+                    state = structuredClone(ex.state);
+                    run();
+                };
+                exBox.appendChild(b);
+            });
+            if (location.hash.length > 2) {
+                try {
+                    state = JSON.parse(
+                        decodeURIComponent(location.hash.slice(1)),
+                    );
+                } catch {
+                    /* keep default */
+                }
+            }
+            renderSentence();
+            (async () => {
+                places = (await (await fetch("places.json")).json()).map(
+                    (r) => r.name,
+                );
+                await initDB();
+                document.getElementById("loading-overlay").style.display =
+                    "none";
+                run();
+            })().catch((e) => {
+                status(UI.engine_failed);
+                console.error(e);
+            });
+        </script>
+    </body>
 </html>
