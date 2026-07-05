@@ -61,17 +61,22 @@
                 display: inline-flex;
                 align-items: center;
                 gap: 6px;
-                padding: 7px 12px;
-                border-radius: 18px;
-                font-weight: 700;
+                padding: 6px 13px;
+                /* slightly uneven corners read hand-drawn, not corporate */
+                border-radius: 16px 19px 15px 20px;
+                font-weight: 600;
                 font-size: 15px;
                 cursor: pointer;
                 border: 2px solid transparent;
                 user-select: none;
                 position: relative;
+                transition:
+                    transform 0.08s ease,
+                    filter 0.08s ease;
             }
             .chip:hover {
-                filter: brightness(0.95);
+                filter: brightness(0.97);
+                transform: rotate(-1deg);
             }
             .chip .x {
                 opacity: 0.45;
@@ -82,30 +87,34 @@
                 opacity: 1;
             }
             .chip.noun {
-                background: #d3f2d3;
+                background: #e2f6e2;
                 color: #1b5e20;
+                border-color: #a3d9a3;
             }
             .chip.attr {
-                background: #ffe9c2;
+                background: #fff2d6;
                 color: #8a5a00;
+                border-color: #e6c680;
             }
             .chip.spatial {
-                background: #d6e8ff;
+                background: #e4f0ff;
                 color: #0d47a1;
+                border-color: #a8c9f2;
             }
             .chip.time {
-                background: #ffdcd2;
+                background: #ffe6de;
                 color: #b23c17;
+                border-color: #f0b09c;
             }
             .chip.place {
-                background: #ead6ff;
+                background: #f2e5ff;
                 color: #5e1fa8;
+                border-color: #cbabee;
             }
             .chip.add {
                 background: #fff;
                 color: #888;
                 border: 2px dashed #bbb;
-                font-weight: 600;
             }
             .chip.add:hover {
                 color: #333;
@@ -154,15 +163,22 @@
                 flex-wrap: wrap;
             }
             #examples button {
-                border: 1px solid #ccc;
+                border: 1.5px solid #cbd0e0;
                 background: #fff;
-                border-radius: 14px;
+                border-radius: 13px 15px 12px 16px;
                 padding: 4px 12px;
                 cursor: pointer;
                 font-size: 13px;
+                font-family: inherit;
+                color: #555;
+                transition:
+                    transform 0.08s ease,
+                    border-color 0.08s ease;
             }
             #examples button:hover {
                 background: #eef;
+                border-color: #9aa4c8;
+                transform: rotate(-1deg);
             }
             #map {
                 flex: 1;
@@ -230,16 +246,23 @@
                 color: #444;
             }
             .hdr-btn {
-                border: 1px solid #555;
+                border: 1.5px solid #555;
                 background: transparent;
                 color: #eee;
-                border-radius: 14px;
+                border-radius: 13px 15px 12px 16px;
                 padding: 4px 12px;
                 cursor: pointer;
                 font-size: 13px;
+                font-family: inherit;
+                transition:
+                    transform 0.08s ease,
+                    border-color 0.08s ease,
+                    background 0.08s ease;
             }
             .hdr-btn:hover {
                 background: #333;
+                border-color: #888;
+                transform: rotate(-1deg);
             }
             .maplibregl-ctrl-group button {
                 width: 44px;
@@ -342,12 +365,21 @@
             }
             #share-panel button {
                 margin-top: 8px;
-                border: 1px solid #ccc;
+                border: 1.5px solid #cbd0e0;
                 background: #fff;
-                border-radius: 14px;
+                border-radius: 13px 15px 12px 16px;
                 padding: 5px 14px;
                 cursor: pointer;
                 font-size: 13px;
+                font-family: inherit;
+                color: #555;
+                transition:
+                    transform 0.08s ease,
+                    border-color 0.08s ease;
+            }
+            #share-panel button:hover {
+                border-color: #9aa4c8;
+                transform: rotate(-1deg);
             }
             #share-url {
                 margin-top: 8px;
