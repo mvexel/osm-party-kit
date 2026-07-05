@@ -11,8 +11,6 @@
     "ready": "ready",
     "loading": "loading the map data…",
     "engine_failed": "engine failed to load — see console",
-    "narrow": "add a place or predicate to narrow",
-    "showing_first": "showing first",
     "campaign": "are missing this — nobody maps it here yet. That's not a gap, it's a campaign waiting to happen.",
     "unnamed": "(unnamed)",
     "last_edited": "last edited",

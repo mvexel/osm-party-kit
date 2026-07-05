@@ -522,7 +522,6 @@
                 time: TIME_OPTS,
                 examples: EXAMPLES,
             } = LANG;
-            const MAX_DOTS = 2000;
 
             document.getElementById("app-title").textContent = `${PARTY.title}`;
             document.getElementById("app-subtitle").textContent = `${PARTY.subtitle}`;
@@ -633,7 +632,7 @@
                         banner.textContent = `⚠️ ${((100 * n) / total).toFixed(0)}% ${UI.campaign}`;
                     } else banner.style.display = "none";
                     await mapReady;
-                    await drawDots(t, my, n);
+                    await drawDots(t, my);
                 } catch (e) {
                     if (my === runToken) {
                         document.getElementById("count").textContent = "⚠";
@@ -641,11 +640,11 @@
                     }
                 }
             }
-            async function drawDots(t, my, n) {
+            async function drawDots(t, my) {
                 const hasName = "name" in (NOUNS[state.noun].attrs || {});
                 const cols = `lon, lat, osm_id, osm_type, ${hasName ? "name" : "NULL AS name"}, timestamp`;
                 const rows = await q(
-                    `SELECT ${cols} FROM ${t} ${whereClauses(state)} LIMIT ${MAX_DOTS}`,
+                    `SELECT ${cols} FROM ${t} ${whereClauses(state)}`,
                 );
                 if (my !== runToken) return;
                 const feats = rows
@@ -672,10 +671,6 @@
                     feats.forEach((f) => b.extend(f.geometry.coordinates));
                     map.fitBounds(b, { padding: 40, maxZoom: 14 });
                 }
-                document.getElementById("count-context").textContent +=
-                    n > MAX_DOTS
-                        ? ` — ${UI.showing_first} ${MAX_DOTS.toLocaleString()}, ${UI.narrow}`
-                        : "";
             }
 
             // ---------------------------------------------------------------- sentence UI
