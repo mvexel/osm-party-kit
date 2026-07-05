@@ -50,6 +50,7 @@
     "identity_handle": "handle — optional",
     "identity_color": "color",
     "identity_me": "me",
+    "scribble_anon": "someone",
     "cancel": "cancel",
     "save": "save",
     "pad_link": "party pad",

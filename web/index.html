@@ -1240,6 +1240,31 @@
                             "line-opacity": 0.6,
                         },
                     });
+                    // Tap a scribble to see who drew it. The handle + colour ride
+                    // along on every feature already — this just surfaces them.
+                    // Muted while drawing so a tap places a mark, not a popup.
+                    for (const layer of ["scribbles-line", "scribble-stamp-labels"]) {
+                        map.on("click", layer, (e) => {
+                            if (drawMode) return;
+                            const p = e.features[0].properties;
+                            const who = p.h || (UI.scribble_anon ?? "someone");
+                            new maplibregl.Popup()
+                                .setLngLat(e.lngLat)
+                                .setHTML(
+                                    `<span class="swatch-dot" style="background:${p.c}"></span> ${who}`,
+                                )
+                                .addTo(map);
+                        });
+                        map.on("mouseenter", layer, () => {
+                            if (!drawMode)
+                                map.getCanvas().style.cursor = "pointer";
+                        });
+                        map.on(
+                            "mouseleave",
+                            layer,
+                            () => (map.getCanvas().style.cursor = ""),
+                        );
+                    }
                     res();
                 }),
             );
