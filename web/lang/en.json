@@ -14,6 +14,8 @@
     "campaign": "are missing this — nobody maps it here yet. That's not a gap, it's a campaign waiting to happen.",
     "unnamed": "(unnamed)",
     "last_edited": "last edited",
+    "has_line": "has",
+    "missing_line": "does not have",
     "view_osm": "view on osm.org",
     "fix_id": "fix in iD",
     "menu_missing": "missing something?",

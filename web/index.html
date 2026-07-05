@@ -4,6 +4,9 @@
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>osmlogo — ask the map</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=DynaPuff:wght@400..700&display=swap" rel="stylesheet">
         <link
             rel="stylesheet"
             href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css"
@@ -15,7 +18,7 @@
             body {
                 margin: 0;
                 font-family:
-                    -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                    DynaPuff, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
                 display: flex;
                 flex-direction: column;
                 height: 100vh;
@@ -641,27 +644,55 @@
                 }
             }
             async function drawDots(t, my) {
-                const hasName = "name" in (NOUNS[state.noun].attrs || {});
-                const cols = `lon, lat, osm_id, osm_type, ${hasName ? "name" : "NULL AS name"}, timestamp`;
+                const nn = NOUNS[state.noun];
+                const attrs = Object.entries(nn.attrs || {});
+                const contains = Object.entries(nn.contains || {});
+                const hasName = "name" in (nn.attrs || {});
+                // name drives the popup title; the rest feed the has / doesn't-have lines.
+                const extraCols = [
+                    ...attrs.map(([k]) => k),
+                    ...contains.map(([k]) => k),
+                ].filter((k) => k !== "name");
+                const cols = [
+                    "lon",
+                    "lat",
+                    "osm_id",
+                    "osm_type",
+                    hasName ? "name" : "NULL AS name",
+                    "timestamp",
+                    ...extraCols,
+                ].join(", ");
                 const rows = await q(
                     `SELECT ${cols} FROM ${t} ${whereClauses(state)}`,
                 );
                 if (my !== runToken) return;
                 const feats = rows
                     .filter((r) => r.lon != null)
-                    .map((r) => ({
-                        type: "Feature",
-                        geometry: {
-                            type: "Point",
-                            coordinates: [r.lon, r.lat],
-                        },
-                        properties: {
-                            name: r.name ?? UI.unnamed,
-                            osm_id: String(r.osm_id),
-                            osm_type: r.osm_type,
-                            ts: String(r.timestamp).slice(0, 10),
-                        },
-                    }));
+                    .map((r) => {
+                        const has = [],
+                            missing = [];
+                        for (const [k, label] of attrs) {
+                            if (k === "name") continue;
+                            (r[k] != null ? has : missing).push(label);
+                        }
+                        for (const [k, label] of contains)
+                            (Number(r[k]) > 0 ? has : missing).push(label);
+                        return {
+                            type: "Feature",
+                            geometry: {
+                                type: "Point",
+                                coordinates: [r.lon, r.lat],
+                            },
+                            properties: {
+                                name: r.name ?? UI.unnamed,
+                                osm_id: String(r.osm_id),
+                                osm_type: r.osm_type,
+                                ts: String(r.timestamp).slice(0, 10),
+                                has: JSON.stringify(has),
+                                missing: JSON.stringify(missing),
+                            },
+                        };
+                    });
                 map.getSource("dots").setData({
                     type: "FeatureCollection",
                     features: feats,
@@ -1169,12 +1200,24 @@
                         const p = e.features[0].properties;
                         const osmUrl = `https://www.openstreetmap.org/${p.osm_type}/${p.osm_id}`;
                         const idUrl = `https://www.openstreetmap.org/edit?${p.osm_type}=${p.osm_id}`;
+                        const has = JSON.parse(p.has || "[]");
+                        const missing = JSON.parse(p.missing || "[]");
+                        const lines = [
+                            `<b>${p.name}</b>`,
+                            `${UI.last_edited} ${p.ts}`,
+                        ];
+                        if (has.length)
+                            lines.push(`✅ ${UI.has_line} ${has.join(", ")}`);
+                        if (missing.length)
+                            lines.push(
+                                `❌ ${UI.missing_line} ${missing.join(", ")}`,
+                            );
+                        lines.push(
+                            `<a href="${osmUrl}" target="_blank">${UI.view_osm}</a> · <a href="${idUrl}" target="_blank">${UI.fix_id}</a>`,
+                        );
                         new maplibregl.Popup()
                             .setLngLat(e.lngLat)
-                            .setHTML(
-                                `<b>${p.name}</b><br>${UI.last_edited} ${p.ts}<br>
-       <a href="${osmUrl}" target="_blank">${UI.view_osm}</a> · <a href="${idUrl}" target="_blank">${UI.fix_id}</a>`,
-                            )
+                            .setHTML(lines.join("<br>"))
                             .addTo(map);
                     });
                     map.on(
