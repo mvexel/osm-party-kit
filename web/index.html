@@ -731,7 +731,6 @@ mapReady.then(() => {
       const msg = { t: 's', id, c: myColor, h: myHandle, pts: [px2ll(e)] };
       tx ? (msg.tx = tx) : (msg.g = activeStamp);
       postScribble(msg);
-      setDrawMode(false);
       return;
     }
     canvas.setPointerCapture(e.pointerId);
