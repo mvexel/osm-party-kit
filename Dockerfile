@@ -6,7 +6,7 @@
 FROM rust:1-slim AS cosmo
 RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates \
     && rm -rf /var/lib/apt/lists/*
-RUN cargo install --git https://codeberg.org/mvexel/cosmo --locked
+RUN cargo install --git https://github.com/mvexel/cosmo --locked
 
 FROM python:3.13-slim
 ARG DUCKDB_VERSION=v1.5.4
